@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
-  "name": "netatmo-indicator",
+  "name": "Netatmo Indicator",
   "version": "1.0.0",
-  "description": "netatmo-indicator description",
+  "description": "See the CO2 level in the browser toolbar",
   "permissions": [
     "identity",
     "storage",
