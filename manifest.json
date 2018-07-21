@@ -6,7 +6,8 @@
   "permissions": [
     "identity",
     "storage",
-    "alarms"
+    "alarms",
+    "theme"
   ],
   "icons": {
     "64": "icon.svg"

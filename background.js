@@ -120,10 +120,10 @@ const netatmo = {
         if(this.co2 >= 1500) {
             return browser.runtime.getUrl('status/red.svg');
         }
-        else if(this.co2 > 1000) {
+        else if(this.co2 >= 1000) {
             return browser.runtime.getUrl('status/orange.svg');
         }
-        else if(this.co2 > 800) {
+        else if(this.co2 >= 800) {
             return browser.runtime.getUrl('status/yellow.svg');
         }
         else if(this.co2 >= 0) {
@@ -131,11 +131,41 @@ const netatmo = {
         }
         return browser.runtime.getUrl('status/gray.svg');
     },
+    getColor() {
+        if(this.co2 >= 1500) {
+            return '#ff0039';
+        }
+        else if(this.co2 >= 1000) {
+            return '#ff9400';
+        }
+        else if(this.co2 >= 800) {
+            return '#ffe900';
+        }
+        else if(this.co2 >= 0) {
+            return '#30e60b';
+        }
+    },
     async updateButton() {
         await browser.browserAction.setIcon({
             path: this.getImage()
         });
         await browser.browserAction.setTitle(`${this.name}: ${this.co2}ppm`);
+        const { updateTheme } = await browser.storage.local.get({
+            updateTheme: false
+        });
+        if(updateTheme) {
+            const color = this.getColor();
+            if(color) {
+                browser.theme.update({
+                    colors: {
+                        accentcolor: color
+                    }
+                });
+            }
+            else {
+                browser.theme.reset();
+            }
+        }
     },
     async init() {
         browser.alarms.onAlarm.addListener((alarm) => {
