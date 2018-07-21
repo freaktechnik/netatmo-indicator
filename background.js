@@ -6,6 +6,11 @@ const HEX = 16;
 const clientSecret = '';
 const clientToken = '';
 
+//TODO get actual API credentials (netatmo had a disruption when I first wrote this)
+//TODO let user choose station, including health thingies.
+//TODO let user choose barriers between the different states
+//TODO let user actually enable dynamic theme part
+
 const netatmo = {
     REFRESH_ALARM: 'refresh',
     UPDATE_ALARM: 'update',
