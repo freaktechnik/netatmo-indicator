@@ -1,8 +1,9 @@
 {
   "manifest_version": 2,
-  "name": "Netatmo Indicator",
+  "name": "Netatmo CO₂ Indicator",
+  "short_name": "CO₂ Indicator",
   "version": "1.0.0",
-  "description": "See the CO2 level in the browser toolbar",
+  "description": "See the CO₂ level in the browser toolbar",
   "permissions": [
     "identity",
     "storage",
@@ -13,7 +14,7 @@
     "64": "icon.svg"
   },
   "browser_action": {
-    "default_title": "Netatmo CO2 Measurement",
+    "default_title": "Netatmo CO₂ Measurement",
     "default_icon": "status/gray.svg"
   },
   "background": {
