@@ -135,7 +135,7 @@ const netatmo = {
         await browser.browserAction.setIcon({
             path: this.getImage()
         });
-        await browser.browserAction.setTitle(`${this.name}: ${this.co2}`);
+        await browser.browserAction.setTitle(`${this.name}: ${this.co2}ppm`);
     },
     async init() {
         browser.alarms.onAlarm.addListener((alarm) => {
