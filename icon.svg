@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://www.w3.org/2000/svg" height="64" width="64" version="1.1" xmlns:cc="http://creativecommons.org/ns#" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 64.000001 64.000001" xmlns:dc="http://purl.org/dc/elements/1.1/">
+ <defs>
+  <linearGradient id="b" y2="-32.126" gradientUnits="userSpaceOnUse" x2="1052.3" gradientTransform="translate(-2040.7 64.253)" y1="-32.126" x1="988.34">
+   <stop stop-color="#b1b1b3" offset="0"/>
+   <stop stop-color="#ededf0" offset="1"/>
+  </linearGradient>
+  <linearGradient id="a" y2="1040.3" gradientUnits="userSpaceOnUse" x2="31.723" gradientTransform="translate(-64 -2040.7)" y1="999.78" x1="31.723">
+   <stop stop-color="#fff" offset="0"/>
+   <stop stop-color="#ededf0" offset="1"/>
+  </linearGradient>
+ </defs>
+ <g transform="translate(0 -988.36)">
+  <rect ry="12.879" transform="rotate(-90)" height="64" width="64" y=".12627" x="-1052.3" fill="url(#b)"/>
+  <rect stroke-linejoin="round" stroke-dasharray="0.60000002, 0.30000000999999998" transform="scale(-1)" ry="7.197" height="40" width="20" stroke="#45a1ff" stroke-linecap="round" y="-1040.4" x="-42" stroke-width="0.3" fill="url(#a)"/>
+ </g>
+</svg>

@@ -1,0 +1,23 @@
+{
+  "manifest_version": 2,
+  "name": "netatmo-indicator",
+  "version": "1.0.0",
+  "description": "netatmo-indicator description",
+  "permissions": [
+    "identity",
+    "storage",
+    "alarms"
+  ],
+  "icons": {
+    "64": "icon.svg"
+  },
+  "browser_action": {
+    "default_title": "Netatmo CO2 Measurement",
+    "default_icon": "status/gray.svg"
+  },
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  }
+}
