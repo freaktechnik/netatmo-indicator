@@ -3,8 +3,6 @@
 const API_BASE = 'https://api.netatmo.com/';
 const redirectUri = 'https://netatmo.humanoids.be';
 const HEX = 16;
-const clientSecret = '';
-const clientToken = '';
 
 //TODO get actual API credentials (netatmo had a disruption when I first wrote this)
 //TODO let user choose station, including health thingies.
@@ -22,8 +20,7 @@ const netatmo = {
         body.append('refresh_token', refreshToken);
         body.append('client_id', clientToken);
         body.append('client_secret', clientSecret);
-        const res = await fetch({
-            url: `${API_BASE}oauth2/token`,
+        const res = await fetch(`${API_BASE}oauth2/token`, {
             method: 'POST',
             body
         });
@@ -44,20 +41,14 @@ const netatmo = {
         await this.ensureUpdateLoop();
     },
     scheduleRefresh(date) {
-        browser.alarms.create({
-            name: this.REFRESH_ALARM,
-            alarmInfo: {
-                when: date
-            }
+        browser.alarms.create(this.REFRESH_ALARM, {
+            when: date
         });
     },
     async ensureUpdateLoop() {
         if(!this.hasUpdateLoop) {
-            browser.alarms.create({
-                name: this.UPDATE_ALARM,
-                alarmInfo: {
-                    periodInMinutes: 10
-                }
+            browser.alarms.create(this.UPDATE_ALARM, {
+                periodInMinutes: 10
             });
             this.hasUpdateLoop = true;
             await this.getStationData();
@@ -69,8 +60,7 @@ const netatmo = {
         }
         const body = new URLSearchParams();
         body.append('access_token', this.token);
-        const res = await fetch({
-            url: `${API_BASE}api/getstationsdata`,
+        const res = await fetch(`${API_BASE}api/getstationsdata`, {
             method: 'POST',
             body
         });
@@ -79,7 +69,7 @@ const netatmo = {
             const { body: { devices } } = data;
             if(devices.length) {
                 const station = devices[0];
-                await this.setState(station.name, station.dashboard_data.CO2);
+                return this.setState(`${station.station_name} - ${station.module_name}`, station.dashboard_data.CO2);
             }
         }
         throw new Error("Failed to fetch station data");
@@ -90,8 +80,7 @@ const netatmo = {
         }
         const body = new URLSearchParams();
         body.append('access_token', this.token);
-        const res = await fetch({
-            url: `${API_BASE}api/gethomecoachsdata`,
+        const res = await fetch(`${API_BASE}api/gethomecoachsdata`, {
             method: 'POST',
             body
         });
@@ -100,9 +89,10 @@ const netatmo = {
             const { body: devices } = data;
             if(devices.length) {
                 const station = device[0];
-                await this.setState(station.module_name, station.dashboard_data.CO2);
+                return this.setState(station.name || station.module_name, station.dashboard_data.CO2);
             }
         }
+        throw new Error("failed to fetch health coach data");
     },
     async restoreState() {
         const { name, co2 } = await browser.storage.local.get([ 'name', 'co2' ]);
@@ -123,18 +113,18 @@ const netatmo = {
     },
     getImage() {
         if(this.co2 >= 1500) {
-            return browser.runtime.getUrl('status/red.svg');
+            return browser.runtime.getURL('status/red.svg');
         }
         else if(this.co2 >= 1000) {
-            return browser.runtime.getUrl('status/orange.svg');
+            return browser.runtime.getURL('status/orange.svg');
         }
         else if(this.co2 >= 800) {
-            return browser.runtime.getUrl('status/yellow.svg');
+            return browser.runtime.getURL('status/yellow.svg');
         }
         else if(this.co2 >= 0) {
-            return browser.runtime.getUrl('status/green.svg');
+            return browser.runtime.getURL('status/green.svg');
         }
-        return browser.runtime.getUrl('status/gray.svg');
+        return browser.runtime.getURL('status/gray.svg');
     },
     getColor() {
         if(this.co2 >= 1500) {
@@ -154,10 +144,23 @@ const netatmo = {
         await browser.browserAction.setIcon({
             path: this.getImage()
         });
-        await browser.browserAction.setTitle(`${this.name}: ${this.co2}ppm`);
-        const { updateTheme } = await browser.storage.local.get({
-            updateTheme: false
+        await browser.browserAction.setTitle({
+          title: `${this.name}: ${this.co2}ppm`
         });
+        const { updateTheme, ppmOnBadge } = await browser.storage.local.get({
+            updateTheme: false,
+            ppmOnBadge: false
+        });
+        if(ppmOnBadge) {
+            await browser.browserAction.setBadgeText({
+                text: this.co2
+            });
+        }
+        else {
+            await browser.browserAction.setBadgeText({
+                text: ''
+            });
+        }
         if(updateTheme) {
             const color = this.getColor();
             if(color) {
@@ -194,7 +197,7 @@ const netatmo = {
         ]);
         if(!token) {
             const authState = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(HEX);
-            const scopes = 'read_station.read_homecoach';
+            const scopes = 'read_station+read_homecoach';
             const url = await browser.identity.launchWebAuthFlow({
                 url: `${API_BASE}oauth2/authorize?client_id=${clientToken}&client_secret=${clientSecret}&redirect_uri=${redirectUri}&state=${authState}&scope=${scopes}`,
                 interactive: true
@@ -203,14 +206,13 @@ const netatmo = {
             if(parsedUrl.searchParams.has('state') && parsedUrl.searchParams.get('state') === authState && parsedUrl.searchParams.has('code')) {
                 const code = parsedUrl.searchParams.get('code');
                 const body = new URLSearchParams;
-                body.append('scope', scopes);
+                body.append('scope', scopes.replace(/\+/g, ' '));
                 body.append('code', code);
                 body.append('grant_type', 'authorization_code');
                 body.append('client_id', clientToken);
                 body.append('client_secret', clientSecret);
                 body.append('redirect_uri', redirectUri);
-                const res = await fetch({
-                    url: `${API_BASE}oauth2/token`,
+                const res = await fetch(`${API_BASE}oauth2/token`, {
                     method: 'POST',
                     body
                 });
