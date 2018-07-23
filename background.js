@@ -140,6 +140,20 @@ const netatmo = {
             return '#30e60b';
         }
     },
+    getDarkColor() {
+        if(this.co2 >= 1500) {
+            return '#5a0002';
+        }
+        else if(this.co2 >= 1000) {
+            return '#712b00';
+        }
+        else if(this.co2 >= 800) {
+            return '#715100';
+        }
+        else if(this.co2 >= 0) {
+            return '#006504';
+        }
+    },
     async updateButton() {
         await browser.browserAction.setIcon({
             path: this.getImage()
@@ -152,9 +166,14 @@ const netatmo = {
             ppmOnBadge: false
         });
         if(ppmOnBadge) {
-            await browser.browserAction.setBadgeText({
-                text: this.co2
-            });
+            await Promise.all([
+                browser.browserAction.setBadgeText({
+                    text: this.co2.toString(10)
+                }),
+                browser.browserAction.setBadgeBackgroundColor({
+                    color: this.getDarkColor()
+                })
+            ]);
         }
         else {
             await browser.browserAction.setBadgeText({
@@ -189,6 +208,16 @@ const netatmo = {
             browser.tabs.create({
                 url: 'https://my.netatmo.com'
             });
+        });
+        browser.storage.onChanged.addListener((changes, area) => {
+            if(area === 'local') {
+                if(('ppmOnBadge' in changes) || ('updateTheme' in changes && changes.updateTheme.newValue)) {
+                    this.updateButton();
+                }
+                if('updateTheme' in changes && changes.updateTheme.oldValue && !changes.updateTheme.newValue) {
+                    browser.theme.reset();
+                }
+            }
         });
         const { token, expires, refreshToken } = await browser.storage.local.get([
             'token',

@@ -22,5 +22,9 @@
       "config.js",
       "background.js"
     ]
+  },
+  "options_ui": {
+    "page": "options.html",
+    "browser_style": true
   }
 }
