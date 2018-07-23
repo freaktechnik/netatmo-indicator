@@ -32,6 +32,10 @@
             <input type="checkbox" id="ppmOnBadge">
             <label for="ppmOnBadge">Show CO₂ concentration as badge</label>
         </section>
-        <!--TODO select ranges for different warning colors -->
+        <section>
+            <p><label for="red"><span class="color red">Red</span> when ppm above</label><input type="number" id="red" min="0" step="1" value="1500"></p>
+            <p><label for="orange"><span class="color orange">Orange</span> when ppm above</label><input type="number" id="orange" min="0" step="1" value="1000"></p>
+            <p><label for="yellow"><span class="color yellow">Yellow</span> when ppm above</label><input type="number" id="yellow" min="0" step="1" value="800"></p>
+        </section>
     </body>
 </html>

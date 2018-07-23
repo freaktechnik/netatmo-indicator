@@ -12,3 +12,19 @@ section > section {
 section > small {
     margin-left: 2rem;
 }
+
+.color {
+    padding: .1em;
+}
+
+.red {
+    background: #ff0039;
+}
+
+.orange {
+    background: #ff9400;
+}
+
+.yellow {
+    background: #ffe900;
+}

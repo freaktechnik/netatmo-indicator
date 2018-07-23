@@ -224,14 +224,14 @@ const netatmo = {
         }
         await this.updateButton();
     },
-    getImage() {
-        if(this.device.co2 >= 1500) {
+    getImage(boundaries) {
+        if(this.device.co2 >= boundaries.red) {
             return browser.runtime.getURL('status/red.svg');
         }
-        else if(this.device.co2 >= 1000) {
+        else if(this.device.co2 >= boundaries.orange) {
             return browser.runtime.getURL('status/orange.svg');
         }
-        else if(this.device.co2 >= 800) {
+        else if(this.device.co2 >= boundaries.yellow) {
             return browser.runtime.getURL('status/yellow.svg');
         }
         else if(this.device.co2 >= 0) {
@@ -239,28 +239,28 @@ const netatmo = {
         }
         return browser.runtime.getURL('status/gray.svg');
     },
-    getColor(onlyWarnTheme = false) {
-        if(this.device.co2 >= 1500) {
+    getColor(boundaries, onlyWarnTheme = false) {
+        if(this.device.co2 >= boundaries.red) {
             return '#ff0039';
         }
-        else if(this.device.co2 >= 1000) {
+        else if(this.device.co2 >= boundaries.orange) {
             return '#ff9400';
         }
-        else if(this.device.co2 >= 800) {
+        else if(this.device.co2 >= boundaries.yellow) {
             return '#ffe900';
         }
         else if(this.device.co2 >= 0 && !onlyWarnTheme) {
             return '#30e60b';
         }
     },
-    getDarkColor() {
-        if(this.device.co2 >= 1500) {
+    getDarkColor(boundaries) {
+        if(this.device.co2 >= boundaries.red) {
             return '#5a0002';
         }
-        else if(this.device.co2 >= 1000) {
+        else if(this.device.co2 >= boundaries.orange) {
             return '#712b00';
         }
-        else if(this.device.co2 >= 800) {
+        else if(this.device.co2 >= boundaries.yellow) {
             return '#715100';
         }
         else if(this.device.co2 >= 0) {
@@ -268,16 +268,21 @@ const netatmo = {
         }
     },
     async updateButton() {
+        const { updateTheme, ppmOnBadge, onlyWarnTheme, boundaries } = await browser.storage.local.get({
+            updateTheme: false,
+            ppmOnBadge: false,
+            onlyWarnTheme: false,
+            boundaries: {
+                yellow: 800,
+                orange: 1000,
+                red: 1500
+            }
+        });
         await browser.browserAction.setIcon({
-            path: this.getImage()
+            path: this.getImage(boundaries)
         });
         await browser.browserAction.setTitle({
           title: this.device ? `${this.device.name}: ${this.device.co2}ppm` : 'Netatmo CO₂ Measurement'
-        });
-        const { updateTheme, ppmOnBadge, onlyWarnTheme } = await browser.storage.local.get({
-            updateTheme: false,
-            ppmOnBadge: false,
-            onlyWarnTheme: false
         });
         if(ppmOnBadge && this.device.co2 >= 0) {
             await Promise.all([
@@ -285,7 +290,7 @@ const netatmo = {
                     text: this.device.co2.toString(10)
                 }),
                 browser.browserAction.setBadgeBackgroundColor({
-                    color: this.getDarkColor()
+                    color: this.getDarkColor(boundaries)
                 })
             ]);
         }
@@ -295,7 +300,7 @@ const netatmo = {
             });
         }
         if(updateTheme) {
-            const color = this.getColor(onlyWarnTheme);
+            const color = this.getColor(boundaries, onlyWarnTheme);
             if(color) {
                 browser.theme.update({
                     colors: {
@@ -369,7 +374,7 @@ const netatmo = {
         });
         browser.storage.onChanged.addListener((changes, area) => {
             if(area === 'local') {
-                if(changes.hasOwnProperty('ppmOnBadge') || (changes.hasOwnProperty('updateTheme') && changes.updateTheme.newValue) || changes.hasOwnProperty('onlyWarnTheme')) {
+                if(changes.hasOwnProperty('ppmOnBadge') || (changes.hasOwnProperty('updateTheme') && changes.updateTheme.newValue) || changes.hasOwnProperty('onlyWarnTheme') || changes.hasOwnProperty('boundaries')) {
                     this.updateButton().catch(console.error);
                 }
                 if(changes.hasOwnProperty('updateTheme') && changes.updateTheme.oldValue && !changes.updateTheme.newValue) {

@@ -6,6 +6,12 @@ const BOOLEAN_PREFS = [
     'onlyWarnTheme'
 ];
 
+const BOUNDARY_COLORS = [
+    'red',
+    'orange',
+    'yellow'
+];
+
 class BooleanPref {
     constructor(id) {
         this.input = document.getElementById(id);
@@ -73,6 +79,36 @@ const fillStationList = () => {
     }).catch(showError);
 };
 
+const setBoundaryValues = (boundaries) => {
+    for(const color in boundaries) {
+        if(boundaries.hasOwnProperty(color)) {
+            const input = document.getElementById(color);
+            input.value = boundaries[color];
+        }
+    }
+};
+
+const saveBoundaries = () => {
+    const boundaries = {};
+    let prevValue = Infinity;
+    for(const color of BOUNDARY_COLORS) {
+        const input = document.getElementById(color);
+        const value = input.valueAsNumber;
+        input.max = prevValue;
+        if(value > prevValue) {
+            input.setCustomValidity("Must be smaller than the value of the previous color");
+        }
+        else {
+            input.setCustomValidity("");
+            prevValue = value;
+        }
+        boundaries[color] = value;
+    }
+    return browser.storage.local.set({
+        boundaries
+    });
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     const prefs = {};
     const login = document.getElementById("login");
@@ -80,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
     for(const id of BOOLEAN_PREFS) {
         prefs[id] = new BooleanPref(id);
     }
-    browser.storage.local.get(BOOLEAN_PREFS.concat([ 'token', 'interval' ])).then((vals) => {
+    browser.storage.local.get(BOOLEAN_PREFS.concat([ 'token', 'interval', 'boundaries' ])).then((vals) => {
         for(const p in prefs) {
             if(prefs.hasOwnProperty(p)) {
                 prefs[p].updateValue(!!vals[p]);
@@ -92,6 +128,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if(vals.interval) {
             interval.value = vals.interval;
+        }
+        if(vals.boundaries) {
+            setBoundaryValues(vals.boundaries);
         }
     });
 
@@ -129,6 +168,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }, {
         passive: true
     });
+
+    for(const color of BOUNDARY_COLORS) {
+        document.getElementById(color).addEventListener('input', saveBoundaries, {
+            passive: true
+        });
+    }
 }, {
     passive: true,
     once: true
