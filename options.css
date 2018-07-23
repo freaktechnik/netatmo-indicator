@@ -1,0 +1,14 @@
+.error {
+    background: #ff0039;
+    color: white;
+    padding: .5em;
+    margin-bottom: .5em;
+}
+
+section > section {
+    margin-left: 2em;
+}
+
+section > small {
+    margin-left: 2rem;
+}

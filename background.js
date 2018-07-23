@@ -47,14 +47,23 @@ const netatmo = {
     },
     async ensureUpdateLoop() {
         if(!this.hasUpdateLoop) {
-            browser.alarms.create(this.UPDATE_ALARM, {
-                periodInMinutes: 10
-            });
-            this.hasUpdateLoop = true;
-            await this.getStationData();
+            const stations = await this.getStationsList();
+            if(stations.length || this.device) {
+                const { interval } = browser.storage.local.get({
+                    interval: 10
+                });
+                browser.alarms.create(this.UPDATE_ALARM, {
+                    periodInMinutes: interval
+                });
+                this.hasUpdateLoop = true;
+
+                if(!this.device) {
+                    this.setState(stations[0]);
+                }
+            }
         }
     },
-    async getStationData() {
+    async getStationsData() {
         if(!this.token) {
             throw new Error("Not authorized");
         }
@@ -67,14 +76,76 @@ const netatmo = {
         if(res.ok) {
             const data = await res.json();
             const { body: { devices } } = data;
-            if(devices.length) {
-                const station = devices[0];
-                return this.setState(`${station.station_name} - ${station.module_name}`, station.dashboard_data.CO2);
+            const allDevices = [];
+            if(Array.isArray(devices)) {
+                for(const d of devices) {
+                    allDevices.push({
+                        type: 'weather',
+                        group: d.station_name,
+                        module: d.module_name,
+                        name: `${d.station_name} - ${d.module_name}`,
+                        id: d._id,
+                        co2: d.dashboard_data.CO2
+                    });
+                    if(d.modules.length) {
+                        for(const module of d.modules) {
+                            if(module.dashboard_data.hasOwnProperty('CO2')) {
+                                allDevices.push({
+                                    type: 'weather',
+                                    group: d.station_name,
+                                    module: module.module_name,
+                                    name: `${d.station_name} - ${module.module_name}`,
+                                    id: d._id,
+                                    module_id: module._id,
+                                    co2: d.dashboard_data.CO2
+                                });
+                            }
+                        }
+                    }
+                }
             }
+            return allDevices;
         }
         throw new Error("Failed to fetch station data");
     },
-    async getHomeCoachData() {
+    async getStationData() {
+        if(!this.token) {
+            throw new Error("Not authorized");
+        }
+        const body = new URLSearchParams();
+        body.append('access_token', this.token);
+        body.append('device_id', this.device.id);
+        const res = await fetch(`${API_BASE}api/getstationsdata`, {
+            method: 'POST',
+            body
+        });
+        if(res.ok) {
+            const data = await res.json();
+            const { body: { devices } } = data;
+            if(Array.isArray(devices)) {
+                for(const d of devices) {
+                    if(d._id === this.device.id) {
+                        let device = d;
+                        if(this.device.hasOwnProperty('module_id')) {
+                            for(const module of d.modules) {
+                                if(module._id === this.device.module_id) {
+                                    device = module;
+                                    break;
+                                }
+                            }
+                        }
+                        this.device.co2 = device.dashboard_data.CO2;
+                        this.device.group = d.station_name;
+                        this.device.module = device.module_name;
+                        this.device.name = `${d.station_name} - ${device.module_name}`;
+                        return this.setState(this.device);
+                    }
+                }
+            }
+        }
+        throw new Error("Failed to update station data");
+    },
+    async getHomeCoachesData() {
         if(!this.token) {
             throw new Error("Not authorized");
         }
@@ -87,70 +158,112 @@ const netatmo = {
         if(res.ok) {
             const data = await res.json();
             const { body: devices } = data;
-            if(devices.length) {
-                const station = device[0];
-                return this.setState(station.name || station.module_name, station.dashboard_data.CO2);
+            if(Array.isArray(devices)) {
+                return devices.map((d) => {
+                    const name = d.name || d.module_name;
+                    return {
+                        type: 'coach',
+                        group: 'Health coach',
+                        module: name,
+                        name,
+                        id: d._id,
+                        co2: d.dashboard_data.CO2
+                    };
+                });
             }
+            return [];
         }
         throw new Error("failed to fetch health coach data");
     },
+    async getHomeCoachData() {
+        if(!this.token) {
+            throw new Error("Not authorized");
+        }
+        const body = new URLSearchParams();
+        body.append('access_token', this.token);
+        body.append('device_id', this.device.id);
+        const res = await fetch(`${API_BASE}api/gethomecoachsdata`, {
+            method: 'POST',
+            body
+        });
+        if(res.ok) {
+            const data = await res.json();
+            const { body: devices } = data;
+            for(const d of devices) {
+                if(d._id === this.device.id) {
+                    this.device.co2 = d.dashboard_data.CO2;
+                    this.device.module = d.name || d.module_name;
+                    this.device.name = this.device.module;
+                    return this.setState(this.device);
+                }
+            }
+        }
+        throw new Error("failed to update health coach data");
+    },
+    updateData() {
+        if(this.device.type === 'weather') {
+            return this.getStationData();
+        }
+        else if(this.device.type === 'coach') {
+            return this.getHomeCoachData();
+        }
+    },
     async restoreState() {
-        const { name, co2 } = await browser.storage.local.get([ 'name', 'co2' ]);
-        if(name) {
-            this.name = name;
-            this.co2 = co2;
+        const { device } = await browser.storage.local.get([ 'device' ]);
+        if(device) {
+            this.device = device;
             await this.updateButton();
         }
     },
-    async setState(name, co2) {
-        this.name = name;
-        this.co2 = co2;
-        await browser.storage.local.set({
-            name,
-            co2
-        });
+    async setState(device, store = true) {
+        this.device = device;
+        if(store) {
+            await browser.storage.local.set({
+                device
+            });
+        }
         await this.updateButton();
     },
     getImage() {
-        if(this.co2 >= 1500) {
+        if(this.device.co2 >= 1500) {
             return browser.runtime.getURL('status/red.svg');
         }
-        else if(this.co2 >= 1000) {
+        else if(this.device.co2 >= 1000) {
             return browser.runtime.getURL('status/orange.svg');
         }
-        else if(this.co2 >= 800) {
+        else if(this.device.co2 >= 800) {
             return browser.runtime.getURL('status/yellow.svg');
         }
-        else if(this.co2 >= 0) {
+        else if(this.device.co2 >= 0) {
             return browser.runtime.getURL('status/green.svg');
         }
         return browser.runtime.getURL('status/gray.svg');
     },
-    getColor() {
-        if(this.co2 >= 1500) {
+    getColor(onlyWarnTheme = false) {
+        if(this.device.co2 >= 1500) {
             return '#ff0039';
         }
-        else if(this.co2 >= 1000) {
+        else if(this.device.co2 >= 1000) {
             return '#ff9400';
         }
-        else if(this.co2 >= 800) {
+        else if(this.device.co2 >= 800) {
             return '#ffe900';
         }
-        else if(this.co2 >= 0) {
+        else if(this.device.co2 >= 0 && !onlyWarnTheme) {
             return '#30e60b';
         }
     },
     getDarkColor() {
-        if(this.co2 >= 1500) {
+        if(this.device.co2 >= 1500) {
             return '#5a0002';
         }
-        else if(this.co2 >= 1000) {
+        else if(this.device.co2 >= 1000) {
             return '#712b00';
         }
-        else if(this.co2 >= 800) {
+        else if(this.device.co2 >= 800) {
             return '#715100';
         }
-        else if(this.co2 >= 0) {
+        else if(this.device.co2 >= 0) {
             return '#006504';
         }
     },
@@ -159,16 +272,17 @@ const netatmo = {
             path: this.getImage()
         });
         await browser.browserAction.setTitle({
-          title: `${this.name}: ${this.co2}ppm`
+          title: this.device ? `${this.device.name}: ${this.device.co2}ppm` : 'Netatmo CO₂ Measurement'
         });
-        const { updateTheme, ppmOnBadge } = await browser.storage.local.get({
+        const { updateTheme, ppmOnBadge, onlyWarnTheme } = await browser.storage.local.get({
             updateTheme: false,
-            ppmOnBadge: false
+            ppmOnBadge: false,
+            onlyWarnTheme: false
         });
-        if(ppmOnBadge) {
+        if(ppmOnBadge && this.device.co2 >= 0) {
             await Promise.all([
                 browser.browserAction.setBadgeText({
-                    text: this.co2.toString(10)
+                    text: this.device.co2.toString(10)
                 }),
                 browser.browserAction.setBadgeBackgroundColor({
                     color: this.getDarkColor()
@@ -181,7 +295,7 @@ const netatmo = {
             });
         }
         if(updateTheme) {
-            const color = this.getColor();
+            const color = this.getColor(onlyWarnTheme);
             if(color) {
                 browser.theme.update({
                     colors: {
@@ -194,14 +308,58 @@ const netatmo = {
             }
         }
     },
+    async login() {
+        const authState = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(HEX);
+        const scopes = 'read_station+read_homecoach';
+        const url = await browser.identity.launchWebAuthFlow({
+            url: `${API_BASE}oauth2/authorize?client_id=${clientToken}&client_secret=${clientSecret}&redirect_uri=${redirectUri}&state=${authState}&scope=${scopes}`,
+            interactive: true
+        });
+        const parsedUrl = new URL(url);
+        if(parsedUrl.searchParams.has('state') && parsedUrl.searchParams.get('state') === authState && parsedUrl.searchParams.has('code')) {
+            const code = parsedUrl.searchParams.get('code');
+            const body = new URLSearchParams;
+            body.append('scope', scopes.replace(/\+/g, ' '));
+            body.append('code', code);
+            body.append('grant_type', 'authorization_code');
+            body.append('client_id', clientToken);
+            body.append('client_secret', clientSecret);
+            body.append('redirect_uri', redirectUri);
+            const res = await fetch(`${API_BASE}oauth2/token`, {
+                method: 'POST',
+                body
+            });
+            if(res.ok) {
+                const data = await res.json();
+                await this.storeToken(data.access_token, data.expires_in * 1000, data.refresh_token);
+            }
+        }
+        else {
+            throw new Error("Auth failed");
+        }
+    },
+    reset() {
+        const p = browser.alarms.clearAll();
+        this.hasUpdateLoop = false;
+        this.token = undefined;
+        const p2 = this.setState(undefined);
+        return Promise.all([ p, p2 ]);
+    },
+    async getStationsList() {
+        const [ weather, healthcoach ] = await Promise.all([
+            this.getStationsData(),
+            this.getHomeCoachesData()
+        ]);
+        const allDevices = weather.concat(healthcoach);
+        return allDevices;
+    },
     async init() {
         browser.alarms.onAlarm.addListener((alarm) => {
             if(alarm.name === this.REFRESH_ALARM) {
                 this.refreshToken().catch(console.error);
             }
             else if(alarm.name == this.UPDATE_ALARM) {
-                //TODO also support health thingie.
-                this.getStationData().catch(console.error);
+                this.updateData().catch(console.error);
             }
         });
         browser.browserAction.onClicked.addListener(() => {
@@ -211,48 +369,44 @@ const netatmo = {
         });
         browser.storage.onChanged.addListener((changes, area) => {
             if(area === 'local') {
-                if(('ppmOnBadge' in changes) || ('updateTheme' in changes && changes.updateTheme.newValue)) {
-                    this.updateButton();
+                if(changes.hasOwnProperty('ppmOnBadge') || (changes.hasOwnProperty('updateTheme') && changes.updateTheme.newValue) || changes.hasOwnProperty('onlyWarnTheme')) {
+                    this.updateButton().catch(console.error);
                 }
-                if('updateTheme' in changes && changes.updateTheme.oldValue && !changes.updateTheme.newValue) {
+                if(changes.hasOwnProperty('updateTheme') && changes.updateTheme.oldValue && !changes.updateTheme.newValue) {
                     browser.theme.reset();
+                }
+                if(changes.hasOwnProperty('token') && !changes.token.newValue) {
+                    this.reset().catch(console.error);
+                }
+                if(changes.hasOwnProperty('device')) {
+                    this.setState(changes.device.newValue, false);
+                    this.ensureUpdateLoop();
+                }
+                if(changes.hasOwnProperty('interval')) {
+                    if(this.hasUpdateLoop) {
+                        browser.alarms.clear(this.UPDATE_ALARM).then(() => {
+                            browser.alarms.create(this.UPDATE_ALARM, {
+                                periodInMinutes: changes.interval.newValue
+                            });
+                        }).catch(console.error);
+                    }
                 }
             }
         });
-        const { token, expires, refreshToken } = await browser.storage.local.get([
+        browser.runtime.onMessage.addListener((message) => {
+            if(message === 'login') {
+                return this.login();
+            }
+            else if(message === 'getstations') {
+                return this.getStationsList();
+            }
+        });
+        const { token, expires } = await browser.storage.local.get([
             'token',
-            'expires',
-            'refreshToken'
+            'expires'
         ]);
         if(!token) {
-            const authState = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(HEX);
-            const scopes = 'read_station+read_homecoach';
-            const url = await browser.identity.launchWebAuthFlow({
-                url: `${API_BASE}oauth2/authorize?client_id=${clientToken}&client_secret=${clientSecret}&redirect_uri=${redirectUri}&state=${authState}&scope=${scopes}`,
-                interactive: true
-            });
-            const parsedUrl = new URL(url);
-            if(parsedUrl.searchParams.has('state') && parsedUrl.searchParams.get('state') === authState && parsedUrl.searchParams.has('code')) {
-                const code = parsedUrl.searchParams.get('code');
-                const body = new URLSearchParams;
-                body.append('scope', scopes.replace(/\+/g, ' '));
-                body.append('code', code);
-                body.append('grant_type', 'authorization_code');
-                body.append('client_id', clientToken);
-                body.append('client_secret', clientSecret);
-                body.append('redirect_uri', redirectUri);
-                const res = await fetch(`${API_BASE}oauth2/token`, {
-                    method: 'POST',
-                    body
-                });
-                if(res.ok) {
-                    const data = await res.json();
-                    this.storeToken(data.access_token, data.expires_in * 1000, data.refresh_token);
-                }
-            }
-            else {
-                throw new Error("Auth failed");
-            }
+            await this.login();
         }
         else {
             this.token = token;
