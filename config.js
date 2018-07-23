@@ -1,0 +1,2 @@
+const clientSecret = '';
+const clientToken = '';
