@@ -9,7 +9,13 @@ section > section:not(.no-indent) {
     margin-left: 2em;
 }
 
-section > small {
+p {
+    padding: .5em 0 0 0;
+    margin: 0;
+}
+
+section > small,
+p > small {
     margin-left: 2rem;
 }
 

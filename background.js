@@ -14,6 +14,14 @@ const getOutdoorModule = (device) => {
 };
 //TODO window open detection based on noise levels
 
+const BUTTON_PREFS = [
+    'ppmOnBadge',
+    // 'updateTheme', a bit more complicated for resetting
+    'onlyWarnTheme',
+    'windowBadge',
+    'boundaries'
+];
+
 const netatmo = {
     REFRESH_ALARM: 'refresh',
     UPDATE_ALARM: 'update',
@@ -252,13 +260,6 @@ const netatmo = {
         else if(store) {
             this.outdoorTemperature = undefined;
         }
-
-        if(device.temp) {
-            this.indoorTemperature = device.temp;
-        }
-        else if(store) {
-            this.indoorTemperature = undefined;
-        }
         if(store) {
             await browser.storage.local.set({
                 device
@@ -313,11 +314,22 @@ const netatmo = {
         }
     },
     async updateButton() {
-        const { updateTheme, ppmOnBadge, onlyWarnTheme, boundaries } = await browser.storage.local.get({
+        const {
+            updateTheme,
+            ppmOnBadge,
+            onlyWarnTheme,
+            boundaries,
+            windowMin,
+            windowDelta,
+            windowBadge
+        } = await browser.storage.local.get({
             updateTheme: false,
             ppmOnBadge: false,
             onlyWarnTheme: false,
-            boundaries: DEFAULT_BOUNDARIES
+            boundaries: DEFAULT_BOUNDARIES,
+            windowMin: 24,
+            windowDelta: 1,
+            windowBadge: false
         });
         await browser.browserAction.setIcon({
             path: this.getImage(boundaries)
@@ -325,10 +337,22 @@ const netatmo = {
         await browser.browserAction.setTitle({
           title: this.device ? `${this.device.name}: ${this.device.co2}ppm` : 'Netatmo CO₂ Measurement'
         });
+        let badgeText = '';
         if(ppmOnBadge && this.device.co2 >= 0) {
+            badgeText += this.device.co2.toString(10);
+        }
+        if(windowBadge && this.device.canDelta && this.device.co2 >= boundaries.yellow && this.device.temp >= windowMin && this.device.temp - this.outdoorTemperature >= windowDelta) {
+            if(badgeText.length < 4) {
+                badgeText += '!';
+            }
+            else {
+                badgeText = '!';
+            }
+        }
+        if(badgeText.length) {
             await Promise.all([
                 browser.browserAction.setBadgeText({
-                    text: this.device.co2.toString(10)
+                    text: badgeText
                 }),
                 browser.browserAction.setBadgeBackgroundColor({
                     color: this.getDarkColor(boundaries)
@@ -337,7 +361,7 @@ const netatmo = {
         }
         else {
             await browser.browserAction.setBadgeText({
-                text: ''
+                text: badgeText
             });
         }
         if(updateTheme) {
@@ -393,7 +417,7 @@ const netatmo = {
             else if(prevCO2 >= prefs.boundaries.yellow && this.device.co2 < prefs.boundaries.yellow && prefs.greenNotification) {
                 notifSpec.title = `CO₂ back to below ${prefs.boundaries.yellow}ppm`;
             }
-            if(shouldLowerCO2 && this.indoorTemperature >= prefs.windowMin && this.indoorTemperature - this.outdoorTemperature >= prefs.windowDelta) {
+            if(shouldLowerCO2 && this.device.canDelta && this.device.temp >= prefs.windowMin && this.device.temp - this.outdoorTemperature >= prefs.windowDelta) {
                 notifSpec.message += ". Open a window, it's cooler outside!";
             }
             if(notifSpec.title) {
@@ -436,7 +460,6 @@ const netatmo = {
         this.hasUpdateLoop = false;
         this.token = undefined;
         this.outdoorTemperature = undefined;
-        this.indoorTemperature = undefined;
         const p2 = this.setState(undefined);
         return Promise.all([ p, p2 ]);
     },
@@ -464,7 +487,7 @@ const netatmo = {
         });
         browser.storage.onChanged.addListener((changes, area) => {
             if(area === 'local') {
-                if(changes.hasOwnProperty('ppmOnBadge') || (changes.hasOwnProperty('updateTheme') && changes.updateTheme.newValue) || changes.hasOwnProperty('onlyWarnTheme') || changes.hasOwnProperty('boundaries')) {
+                if(BUTTON_PREFS.some((p) => changes.hasOwnProperty(p)) || (changes.hasOwnProperty('updateTheme') && changes.updateTheme.newValue)) {
                     this.updateButton().catch(console.error);
                 }
                 if(changes.hasOwnProperty('updateTheme') && changes.updateTheme.oldValue && !changes.updateTheme.newValue) {
@@ -477,14 +500,12 @@ const netatmo = {
                     this.setState(changes.device.newValue, false);
                     this.ensureUpdateLoop();
                 }
-                if(changes.hasOwnProperty('interval')) {
-                    if(this.hasUpdateLoop) {
-                        browser.alarms.clear(this.UPDATE_ALARM).then(() => {
-                            browser.alarms.create(this.UPDATE_ALARM, {
-                                periodInMinutes: changes.interval.newValue
-                            });
-                        }).catch(console.error);
-                    }
+                if(changes.hasOwnProperty('interval') && this.hasUpdateLoop) {
+                    browser.alarms.clear(this.UPDATE_ALARM).then(() => {
+                        browser.alarms.create(this.UPDATE_ALARM, {
+                            periodInMinutes: changes.interval.newValue
+                        });
+                    }).catch(console.error);
                 }
             }
         });

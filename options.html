@@ -29,10 +29,16 @@
                 <label for="onlyWarnTheme">Only apply color when not green</label>
             </section>
         </section>
-        <section class="browser-style">
+        <section>
             <h2>Toolbar button</h2>
-            <input type="checkbox" id="ppmOnBadge">
-            <label for="ppmOnBadge">Show CO₂ concentration as badge</label>
+            <p class="browser-style">
+                <input type="checkbox" id="ppmOnBadge">
+                <label for="ppmOnBadge">Show CO₂ concentration as badge</label>
+            </p>
+            <p class="browser-style">
+                <input type="checkbox" id="windowBadge"><label for="windowBadge">Show <samp>!</samp> badge on toolbar button when status is not green and the window could be opened.</label>
+                <br><small>This will replace the ppm value in the badge when it has 4 digits</small>
+            </p>
         </section>
         <section>
             <h2>Status boundaries and notifications</h2>

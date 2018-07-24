@@ -7,7 +7,8 @@ const BOOLEAN_PREFS = [
     'redNotification',
     'orangeNotification',
     'yellowNotification',
-    'greenNotification'
+    'greenNotification',
+    'windowBadge'
 ];
 
 const NUMBER_PREFS = [
