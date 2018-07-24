@@ -10,7 +10,56 @@ const DEFAULT_BOUNDARIES = {
 };
 
 const getOutdoorModule = (device) => {
-    return device.modules.find((m) => m.type === "NAModule1");
+    if(device.hasOwnProperty('modules')) {
+        return device.modules.find((m) => m.type === "NAModule1");
+    }
+    return undefined;
+};
+const normalizeModule = (module, station) => {
+    const normalized = Object.assign({}, module);
+    normalized.station_name = station.station_name;
+    normalized.module_id = module._id;
+    normalized._id = station._id;
+    return normalized;
+};
+const findDevice = (stations, device) => {
+    for(const d of stations) {
+        if(d._id === device.id) {
+            if(device.hasOwnProperty('module_id') && d.hasOwnProperty('modules')) {
+                for(const module of d.modules) {
+                    if(module._id === device.module_id) {
+                        return normalizeModule(module, d);
+                    }
+                }
+            }
+            return d;
+        }
+    }
+    return {};
+};
+const formatDevice = (device, type, canDelta = false) => {
+    const formatted = {
+        type,
+        id: device._id,
+        co2: device.dashboard_data.CO2,
+        temp: device.dashboard_data.Temperature,
+        canDelta
+    };
+    if(device.hasOwnProperty('module_id')) {
+        formatted.module_id = device.module_id;
+    }
+    if(type == 'coach') {
+        formatted.group = 'Health coach';
+        const name = device.name || device.module_name;
+        formatted.module = name;
+        formatted.name = name;
+    }
+    else if(type == 'weather') {
+        formatted.group = device.station_name;
+        formatted.module = device.module_name;
+        formatted.name = `${device.station_name} - ${device.module_name}`;
+    }
+    return formatted;
 };
 //TODO window open detection based on noise levels
 
@@ -105,30 +154,11 @@ const netatmo = {
                         }
                         for(const module of d.modules) {
                             if(module.dashboard_data.hasOwnProperty('CO2')) {
-                                allDevices.push({
-                                    type: 'weather',
-                                    group: d.station_name,
-                                    module: module.module_name,
-                                    name: `${d.station_name} - ${module.module_name}`,
-                                    id: d._id,
-                                    module_id: module._id,
-                                    co2: d.dashboard_data.CO2,
-                                    temp: d.dashboard_data.Temperature,
-                                    canDelta: this.canDelta
-                                });
+                                allDevices.push(formatDevice(normalizeModule(module, d), 'weather', this.canDelta));
                             }
                         }
                     }
-                    allDevices.push({
-                        type: 'weather',
-                        group: d.station_name,
-                        module: d.module_name,
-                        name: `${d.station_name} - ${d.module_name}`,
-                        id: d._id,
-                        co2: d.dashboard_data.CO2,
-                        temp: d.dashboard_data.Temperature,
-                        canDelta: this.canDelta
-                    });
+                    allDevices.push(formatDevice(d, 'weather', this.canDelta));
                 }
             }
             return allDevices;
@@ -150,28 +180,19 @@ const netatmo = {
             const data = await res.json();
             const { body: { devices } } = data;
             if(Array.isArray(devices)) {
-                for(const d of devices) {
-                    if(d._id === this.device.id) {
-                        let device = d;
-                        if(this.device.hasOwnProperty('module_id')) {
-                            for(const module of d.modules) {
-                                if(module._id === this.device.module_id) {
-                                    device = module;
-                                    break;
-                                }
-                            }
-                        }
-                        const outdoorModule = getOutdoorModule(d);
-                        if(outdoorModule) {
-                            this.device.temp = device.dashboard_data.Temperature;
-                        }
-                        this.device.co2 = device.dashboard_data.CO2;
-                        this.device.group = d.station_name;
-                        this.device.module = device.module_name;
-                        this.device.name = `${d.station_name} - ${device.module_name}`;
-                        return this.setState(this.device, true, outdoorModule);
-                    }
+                const device = findDevice(devices, this.device);
+                const outdoorModule = getOutdoorModule(findDevice(devices, {
+                    id: device.id
+                }));
+                const newDevice = Object.assign({}, this.device);
+                if(outdoorModule) {
+                    newDevice.temp = device.dashboard_data.Temperature;
                 }
+                newDevice.co2 = device.dashboard_data.CO2;
+                newDevice.group = device.station_name;
+                newDevice.module = device.module_name;
+                newDevice.name = `${device.station_name} - ${device.module_name}`;
+                return this.setState(newDevice, true, outdoorModule);
             }
         }
         throw new Error("Failed to update station data");
@@ -190,19 +211,7 @@ const netatmo = {
             const data = await res.json();
             const { body: devices } = data;
             if(Array.isArray(devices)) {
-                return devices.map((d) => {
-                    const name = d.name || d.module_name;
-                    return {
-                        type: 'coach',
-                        group: 'Health coach',
-                        module: name,
-                        name,
-                        id: d._id,
-                        co2: d.dashboard_data.CO2,
-                        temp: d.dashboard_data.Temperature,
-                        canDelta: false //TODO would need to be able to select outdoor station to check against
-                    };
-                });
+                return devices.map((d) => formatDevice(d, 'coach'));
             }
             return [];
         }
@@ -222,19 +231,20 @@ const netatmo = {
         if(res.ok) {
             const data = await res.json();
             const { body: devices } = data;
-            for(const d of devices) {
-                if(d._id === this.device.id) {
-                    this.device.temp = d.dashboard_data.Temperature;
-                    this.device.co2 = d.dashboard_data.CO2;
-                    this.device.module = d.name || d.module_name;
-                    this.device.name = this.device.module;
-                    return this.setState(this.device);
-                }
+            if(Array.isArray(devices)) {
+                const d = findDevice(devices, this.device);
+                const newDevice = Object.assign({}, this.device);
+                newDevice.temp = d.dashboard_data.Temperature;
+                newDevice.co2 = d.dashboard_data.CO2;
+                newDevice.module = d.name || d.module_name;
+                newDevice.name = newDevice.module;
+                return this.setState(newDevice);
             }
         }
         throw new Error("failed to update health coach data");
     },
     updateData() {
+        console.log("updating", this.device);
         if(this.device.type === 'weather') {
             return this.getStationData();
         }
@@ -245,6 +255,10 @@ const netatmo = {
     async restoreState(stations) {
         const { device } = await browser.storage.local.get('device');
         if(device) {
+            let updatedDevice = stations.find((d) => d.id === device.id);
+            if(!updatedDevice) {
+                updatedDevice = device;
+            }
             await this.setState(device, false);
         }
         else if(stations && stations.length) {
@@ -252,6 +266,7 @@ const netatmo = {
         }
     },
     async setState(device, store = true, outdoorModule) {
+        console.log(device);
         const prevCO2 = this.device ? this.device.co2 : -1;
         this.device = device;
         if(outdoorModule) {
@@ -496,7 +511,7 @@ const netatmo = {
                 if(changes.hasOwnProperty('token') && !changes.token.newValue) {
                     this.reset().catch(console.error);
                 }
-                if(changes.hasOwnProperty('device')) {
+                if(changes.hasOwnProperty('device') && (changes.device.newValue.id != changes.device.oldValue.id || changes.device.newValue.module_id != changes.device.oldValue.module_id)) {
                     this.setState(changes.device.newValue, false);
                     this.ensureUpdateLoop();
                 }
