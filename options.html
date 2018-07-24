@@ -20,6 +20,7 @@
             </select>
         </section>
         <section class="browser-style">
+            <h2>Dynamic theme</h2>
             <input type="checkbox" id="updateTheme">
             <label for="updateTheme">Apply color to browser window</label>
             <br><small>Does not work well with the built-in dark theme of Firefox due to a platform bug.</small>
@@ -29,31 +30,51 @@
             </section>
         </section>
         <section class="browser-style">
+            <h2>Toolbar button</h2>
             <input type="checkbox" id="ppmOnBadge">
             <label for="ppmOnBadge">Show CO₂ concentration as badge</label>
         </section>
         <section>
-            <p><label for="red"><span class="color red">Red</span> when ppm above</label> <input type="number" id="red" min="0" step="1" value="1500" class="browser-style"></p>
+            <h2>Status boundaries and notifications</h2>
+            <p>
+                <label for="red"><span class="color red">Red</span> when ppm above</label>
+                <input type="number" id="red" min="0" step="1" value="1500" class="browser-style">
+            </p>
             <section class="browser-style">
                 <input type="checkbox" id="redNotification"><label for="redNotification">Show notification when rising to red status</label>
             </section>
-            <p><label for="orange"><span class="color orange">Orange</span> when ppm above</label> <input type="number" id="orange" min="0" step="1" value="1000" class="browser-style"></p>
+            <p>
+                <label for="orange"><span class="color orange">Orange</span> when ppm above</label>
+                <input type="number" id="orange" min="0" step="1" value="1000" class="browser-style">
+            </p>
             <section class="browser-style">
                 <input type="checkbox" id="orangeNotification"><label for="orangeNotification">Show notification when rising to orange status</label>
             </section>
-            <p><label for="yellow"><span class="color yellow">Yellow</span> when ppm above</label> <input type="number" id="yellow" min="0" step="1" value="800" class="browser-style"></p>
+            <p>
+                <label for="yellow"><span class="color yellow">Yellow</span> when ppm above</label>
+                <input type="number" id="yellow" min="0" step="1" value="800" class="browser-style">
+            </p>
             <section class="browser-style">
                 <input type="checkbox" id="yellowNotification"><label for="yellowNotification">Show notification when rising to yellow status</label>
             </section>
             <p class="browser-style">
                 <input type="checkbox" id="greenNotification"><label for="greenNotification">Show notification when back down at <span class="color green">green</span> status</label>
             </p>
-            <p id="hasDelta">
-                <label for="windowDelta">Prompt to open window when showing warning notification and temperature outside lower by at least</label>
-                <input type="number" id="windowDelta" min="1" step="1" value="1" class="browser-style">
-                °C
-            </p>
+            <section id="hasDelta" class="no-indent">
+                <h3>Window open prompt</h3>
+                <p>
+                    <label for="windowDelta">Prompt to open window when showing warning notification and temperature outside lower by at least</label>
+                    <input type="number" id="windowDelta" min="1" step="1" value="1" class="browser-style">
+                    °C
+                </p>
+                <p>
+                    <label for="windowMin">Show prompt when indoor temperature above</label>
+                    <input type="number" id="windowMin" step="1" value="24" class="browser-style">
+                    °C
+                </p>
+            </section>
         </section>
+        <hr>
         <section>
             <button id="reset" type="reset" class="browser-style">Reset</button>
         </section>

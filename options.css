@@ -5,7 +5,7 @@
     margin-bottom: .5em;
 }
 
-section > section {
+section > section:not(.no-indent) {
     margin-left: 2em;
 }
 

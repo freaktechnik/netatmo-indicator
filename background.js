@@ -12,11 +12,13 @@ const DEFAULT_BOUNDARIES = {
 const getOutdoorModule = (device) => {
     return device.modules.find((m) => m.type === "NAModule1");
 };
+//TODO window open detection based on noise levels
 
 const netatmo = {
     REFRESH_ALARM: 'refresh',
     UPDATE_ALARM: 'update',
     hasUpdateLoop: false,
+    canDelta: false,
     async refreshToken() {
         const { refreshToken } = await browser.storage.local.get('refreshToken');
         const body = new URLSearchParams();
@@ -86,12 +88,12 @@ const netatmo = {
             const allDevices = [];
             if(Array.isArray(devices)) {
                 for(const d of devices) {
-                    let canDelta = false;
+                    this.canDelta = false;
                     if(d.modules.length) {
                         const outdoorModule = getOutdoorModule(d);
                         if(outdoorModule) {
                             this.outdoorTemperature = outdoorModule.dashboard_data.Temperature;
-                            canDelta = true;
+                            this.canDelta = true;
                         }
                         for(const module of d.modules) {
                             if(module.dashboard_data.hasOwnProperty('CO2')) {
@@ -104,7 +106,7 @@ const netatmo = {
                                     module_id: module._id,
                                     co2: d.dashboard_data.CO2,
                                     temp: d.dashboard_data.Temperature,
-                                    canDelta
+                                    canDelta: this.canDelta
                                 });
                             }
                         }
@@ -117,7 +119,7 @@ const netatmo = {
                         id: d._id,
                         co2: d.dashboard_data.CO2,
                         temp: d.dashboard_data.Temperature,
-                        canDelta
+                        canDelta: this.canDelta
                     });
                 }
             }
@@ -189,7 +191,8 @@ const netatmo = {
                         name,
                         id: d._id,
                         co2: d.dashboard_data.CO2,
-                        canDelta: false
+                        temp: d.dashboard_data.Temperature,
+                        canDelta: false //TODO would need to be able to select outdoor station to check against
                     };
                 });
             }
@@ -213,6 +216,7 @@ const netatmo = {
             const { body: devices } = data;
             for(const d of devices) {
                 if(d._id === this.device.id) {
+                    this.device.temp = d.dashboard_data.Temperature;
                     this.device.co2 = d.dashboard_data.CO2;
                     this.device.module = d.name || d.module_name;
                     this.device.name = this.device.module;
@@ -364,7 +368,8 @@ const netatmo = {
                 yellowNotification: false,
                 greenNotification: false,
                 boundaries: DEFAULT_BOUNDARIES,
-                windowDelta: 1
+                windowDelta: 1,
+                windowMin: 24
             });
             const iconUrl = this.getImage(prefs.boundaries);
             const notifSpec = {
@@ -388,7 +393,7 @@ const netatmo = {
             else if(prevCO2 >= prefs.boundaries.yellow && this.device.co2 < prefs.boundaries.yellow && prefs.greenNotification) {
                 notifSpec.title = `CO₂ back to below ${prefs.boundaries.yellow}ppm`;
             }
-            if(shouldLowerCO2 && this.indoorTemperature - this.outdoorTemperature >= prefs.windowDelta) {
+            if(shouldLowerCO2 && this.indoorTemperature >= prefs.windowMin && this.indoorTemperature - this.outdoorTemperature >= prefs.windowDelta) {
                 notifSpec.message += ". Open a window, it's cooler outside!";
             }
             if(notifSpec.title) {

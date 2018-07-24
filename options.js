@@ -12,7 +12,8 @@ const BOOLEAN_PREFS = [
 
 const NUMBER_PREFS = [
     'interval',
-    'windowDelta'
+    'windowDelta',
+    'windowMin'
 ];
 
 const BOUNDARY_COLORS = [
