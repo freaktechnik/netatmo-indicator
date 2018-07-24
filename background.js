@@ -61,7 +61,6 @@ const formatDevice = (device, type, canDelta = false) => {
     }
     return formatted;
 };
-//TODO window open detection based on noise levels
 
 const BUTTON_PREFS = [
     'ppmOnBadge',
@@ -181,17 +180,14 @@ const netatmo = {
             const { body: { devices } } = data;
             if(Array.isArray(devices)) {
                 const device = findDevice(devices, this.device);
-                const outdoorModule = getOutdoorModule(findDevice(devices, {
-                    id: device.id
-                }));
-                const newDevice = Object.assign({}, this.device);
-                if(outdoorModule) {
-                    newDevice.temp = device.dashboard_data.Temperature;
+                let outdoorModuleParent = device;
+                if(device.hasOwnProperty('module_id')) {
+                    outdoorModuleParent = findDevice(devices, {
+                        id: device._id
+                    });
                 }
-                newDevice.co2 = device.dashboard_data.CO2;
-                newDevice.group = device.station_name;
-                newDevice.module = device.module_name;
-                newDevice.name = `${device.station_name} - ${device.module_name}`;
+                const outdoorModule = getOutdoorModule(outdoorModuleParent);
+                const newDevice = formatDevice(device, 'weather', !!outdoorModule);
                 return this.setState(newDevice, true, outdoorModule);
             }
         }
@@ -233,18 +229,13 @@ const netatmo = {
             const { body: devices } = data;
             if(Array.isArray(devices)) {
                 const d = findDevice(devices, this.device);
-                const newDevice = Object.assign({}, this.device);
-                newDevice.temp = d.dashboard_data.Temperature;
-                newDevice.co2 = d.dashboard_data.CO2;
-                newDevice.module = d.name || d.module_name;
-                newDevice.name = newDevice.module;
+                const newDevice = formatDevice(d, 'coach');
                 return this.setState(newDevice);
             }
         }
         throw new Error("failed to update health coach data");
     },
     updateData() {
-        console.log("updating", this.device);
         if(this.device.type === 'weather') {
             return this.getStationData();
         }
@@ -266,7 +257,6 @@ const netatmo = {
         }
     },
     async setState(device, store = true, outdoorModule) {
-        console.log(device);
         const prevCO2 = this.device ? this.device.co2 : -1;
         this.device = device;
         if(outdoorModule) {
