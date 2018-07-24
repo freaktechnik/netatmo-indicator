@@ -491,8 +491,27 @@ const netatmo = {
                 return this.getStationsList();
             }
         });
-        browser.notifications.onShown.addListener(() => {
-            browser.runtime.sendMessage("@notification-sound", "new-notification");
+        browser.permissions.contains({
+            permissions: [
+                'notifications'
+            ]
+        }).then((hasNotifs) => {
+            const addListener = () => browser.notifications.onShown.addListener(() => {
+                browser.runtime.sendMessage("@notification-sound", "new-notification");
+            });
+            if(hasNotifs) {
+                addListener();
+            }
+            else {
+                const listener = (change) => {
+                    if(change.permissions && change.permissions.includes('notifications'))
+                    {
+                        addListener();
+                        browser.permissions.onAdded.removeListener(listener);
+                    }
+                };
+                browser.permissions.onAdded.addListener(listener);
+            }
         });
         const { token, expires } = await browser.storage.local.get([
             'token',

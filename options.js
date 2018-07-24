@@ -161,7 +161,7 @@ class BoundaryPref {
 
     updateValue(val) {
         for(const boundary of this.boundaries) {
-            if(val.hasOwnProperty(boundary.id)) {
+            if(val && val.hasOwnProperty(boundary.id)) {
                 boundary.updateValue(val[boundary.id]);
             }
         }
@@ -183,7 +183,12 @@ class StationsList extends Pref {
 
     storeValue() {
         const val = this.getValue();
-        this.hasDelta.hidden = !val.canDelta;
+        if(val) {
+            this.hasDelta.hidden = !val.canDelta;
+        }
+        else {
+            this.hasDelta.hidden = true;
+        }
         super.storeValue();
     }
 
@@ -227,7 +232,7 @@ class StationsList extends Pref {
             this.fill(val).catch(showError);
         }
         else {
-            super.updateValue(JSON.stringify(val));
+            super.updateValue(val);
         }
     }
 }
