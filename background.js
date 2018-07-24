@@ -3,11 +3,15 @@
 const API_BASE = 'https://api.netatmo.com/';
 const redirectUri = 'https://netatmo.humanoids.be';
 const HEX = 16;
+const DEFAULT_BOUNDARIES = {
+    yellow: 800,
+    orange: 1000,
+    red: 1500
+};
 
-//TODO get actual API credentials (netatmo had a disruption when I first wrote this)
-//TODO let user choose station, including health thingies.
-//TODO let user choose barriers between the different states
-//TODO let user actually enable dynamic theme part
+const getOutdoorModule = (device) => {
+    return device.modules.find((m) => m.type === "NAModule1");
+};
 
 const netatmo = {
     REFRESH_ALARM: 'refresh',
@@ -49,17 +53,20 @@ const netatmo = {
         if(!this.hasUpdateLoop) {
             const stations = await this.getStationsList();
             if(stations.length || this.device) {
-                const { interval } = browser.storage.local.get({
+                const { interval } = await browser.storage.local.get({
                     interval: 10
                 });
-                browser.alarms.create(this.UPDATE_ALARM, {
-                    periodInMinutes: interval
-                });
-                this.hasUpdateLoop = true;
-
                 if(!this.device) {
-                    this.setState(stations[0]);
+                    await this.restoreState(stations);
                 }
+                const alarmSpec = {
+                    periodInMinutes: interval,
+                };
+                if(this.device) {
+                    alarmSpec.when = Date.now();
+                }
+                browser.alarms.create(this.UPDATE_ALARM, alarmSpec);
+                this.hasUpdateLoop = true;
             }
         }
     },
@@ -79,15 +86,13 @@ const netatmo = {
             const allDevices = [];
             if(Array.isArray(devices)) {
                 for(const d of devices) {
-                    allDevices.push({
-                        type: 'weather',
-                        group: d.station_name,
-                        module: d.module_name,
-                        name: `${d.station_name} - ${d.module_name}`,
-                        id: d._id,
-                        co2: d.dashboard_data.CO2
-                    });
+                    let canDelta = false;
                     if(d.modules.length) {
+                        const outdoorModule = getOutdoorModule(d);
+                        if(outdoorModule) {
+                            this.outdoorTemperature = outdoorModule.dashboard_data.Temperature;
+                            canDelta = true;
+                        }
                         for(const module of d.modules) {
                             if(module.dashboard_data.hasOwnProperty('CO2')) {
                                 allDevices.push({
@@ -97,11 +102,23 @@ const netatmo = {
                                     name: `${d.station_name} - ${module.module_name}`,
                                     id: d._id,
                                     module_id: module._id,
-                                    co2: d.dashboard_data.CO2
+                                    co2: d.dashboard_data.CO2,
+                                    temp: d.dashboard_data.Temperature,
+                                    canDelta
                                 });
                             }
                         }
                     }
+                    allDevices.push({
+                        type: 'weather',
+                        group: d.station_name,
+                        module: d.module_name,
+                        name: `${d.station_name} - ${d.module_name}`,
+                        id: d._id,
+                        co2: d.dashboard_data.CO2,
+                        temp: d.dashboard_data.Temperature,
+                        canDelta
+                    });
                 }
             }
             return allDevices;
@@ -134,11 +151,15 @@ const netatmo = {
                                 }
                             }
                         }
+                        const outdoorModule = getOutdoorModule(d);
+                        if(outdoorModule) {
+                            this.device.temp = device.dashboard_data.Temperature;
+                        }
                         this.device.co2 = device.dashboard_data.CO2;
                         this.device.group = d.station_name;
                         this.device.module = device.module_name;
                         this.device.name = `${d.station_name} - ${device.module_name}`;
-                        return this.setState(this.device);
+                        return this.setState(this.device, true, outdoorModule);
                     }
                 }
             }
@@ -167,7 +188,8 @@ const netatmo = {
                         module: name,
                         name,
                         id: d._id,
-                        co2: d.dashboard_data.CO2
+                        co2: d.dashboard_data.CO2,
+                        canDelta: false
                     };
                 });
             }
@@ -208,36 +230,55 @@ const netatmo = {
             return this.getHomeCoachData();
         }
     },
-    async restoreState() {
-        const { device } = await browser.storage.local.get([ 'device' ]);
+    async restoreState(stations) {
+        const { device } = await browser.storage.local.get('device');
         if(device) {
-            this.device = device;
-            await this.updateButton();
+            await this.setState(device, false);
+        }
+        else if(stations && stations.length) {
+            await this.setState(stations[0], false);
         }
     },
-    async setState(device, store = true) {
+    async setState(device, store = true, outdoorModule) {
+        const prevCO2 = this.device ? this.device.co2 : -1;
         this.device = device;
+        if(outdoorModule) {
+            this.outdoorTemperature = outdoorModule.dashboard_data.Temperature;
+        }
+        else if(store) {
+            this.outdoorTemperature = undefined;
+        }
+
+        if(device.temp) {
+            this.indoorTemperature = device.temp;
+        }
+        else if(store) {
+            this.indoorTemperature = undefined;
+        }
         if(store) {
             await browser.storage.local.set({
                 device
             });
         }
-        await this.updateButton();
+        await Promise.all([
+            this.updateButton(),
+            this.showNotification(prevCO2)
+        ]);
     },
     getImage(boundaries) {
         if(this.device.co2 >= boundaries.red) {
-            return browser.runtime.getURL('status/red.svg');
+            return 'status/red.svg';
         }
         else if(this.device.co2 >= boundaries.orange) {
-            return browser.runtime.getURL('status/orange.svg');
+            return 'status/orange.svg';
         }
         else if(this.device.co2 >= boundaries.yellow) {
-            return browser.runtime.getURL('status/yellow.svg');
+            return 'status/yellow.svg';
         }
         else if(this.device.co2 >= 0) {
-            return browser.runtime.getURL('status/green.svg');
+            return 'status/green.svg';
         }
-        return browser.runtime.getURL('status/gray.svg');
+        return 'status/gray.svg';
     },
     getColor(boundaries, onlyWarnTheme = false) {
         if(this.device.co2 >= boundaries.red) {
@@ -272,11 +313,7 @@ const netatmo = {
             updateTheme: false,
             ppmOnBadge: false,
             onlyWarnTheme: false,
-            boundaries: {
-                yellow: 800,
-                orange: 1000,
-                red: 1500
-            }
+            boundaries: DEFAULT_BOUNDARIES
         });
         await browser.browserAction.setIcon({
             path: this.getImage(boundaries)
@@ -310,6 +347,52 @@ const netatmo = {
             }
             else {
                 browser.theme.reset();
+            }
+        }
+    },
+    async showNotification(prevCO2) {
+        const canShow = await browser.permissions.contains({
+            permissions: [
+                'notifications'
+            ]
+        });
+        if(canShow) {
+            const message = `CO₂ now at ${this.device.co2}ppm`;
+            const prefs = await browser.storage.local.get({
+                redNotification: false,
+                orangeNotification: false,
+                yellowNotification: false,
+                greenNotification: false,
+                boundaries: DEFAULT_BOUNDARIES,
+                windowDelta: 1
+            });
+            const iconUrl = this.getImage(prefs.boundaries);
+            const notifSpec = {
+                message,
+                iconUrl,
+                type: 'basic'
+            };
+            let shouldLowerCO2 = false;
+            if(prevCO2 < prefs.boundaries.yellow && this.device.co2 >= prefs.boundaries.yellow && prefs.yellowNotification) {
+                notifSpec.title = `CO₂ level above ${prefs.boundaries.yellow}ppm`;
+                shouldLowerCO2 = true;
+            }
+            else if(prevCO2 < prefs.boundaries.orange && this.device.co2 >= prefs.boundaries.orange && prefs.orangeNotification) {
+                notifSpec.title = `CO₂ level above ${prefs.boundaries.orange}ppm`;
+                shouldLowerCO2 = true;
+            }
+            else if(prevCO2 < prefs.boundaries.red && this.device.co2 >= prefs.boundaries.red && prefs.redNotification) {
+                notifSpec.title = `CO₂ level above ${prefs.boundaries.red}ppm`;
+                shouldLowerCO2 = true;
+            }
+            else if(prevCO2 >= prefs.boundaries.yellow && this.device.co2 < prefs.boundaries.yellow && prefs.greenNotification) {
+                notifSpec.title = `CO₂ back to below ${prefs.boundaries.yellow}ppm`;
+            }
+            if(shouldLowerCO2 && this.indoorTemperature - this.outdoorTemperature >= prefs.windowDelta) {
+                notifSpec.message += ". Open a window, it's cooler outside!";
+            }
+            if(notifSpec.title) {
+                await browser.notifications.create(notifSpec);
             }
         }
     },
@@ -347,6 +430,8 @@ const netatmo = {
         const p = browser.alarms.clearAll();
         this.hasUpdateLoop = false;
         this.token = undefined;
+        this.outdoorTemperature = undefined;
+        this.indoorTemperature = undefined;
         const p2 = this.setState(undefined);
         return Promise.all([ p, p2 ]);
     },
@@ -405,6 +490,9 @@ const netatmo = {
             else if(message === 'getstations') {
                 return this.getStationsList();
             }
+        });
+        browser.notifications.onShown.addListener(() => {
+            browser.runtime.sendMessage("@notification-sound", "new-notification");
         });
         const { token, expires } = await browser.storage.local.get([
             'token',

@@ -3,7 +3,16 @@
 const BOOLEAN_PREFS = [
     'updateTheme',
     'ppmOnBadge',
-    'onlyWarnTheme'
+    'onlyWarnTheme',
+    'redNotification',
+    'orangeNotification',
+    'yellowNotification',
+    'greenNotification'
+];
+
+const NUMBER_PREFS = [
+    'interval',
+    'windowDelta'
 ];
 
 const BOUNDARY_COLORS = [
@@ -12,22 +21,11 @@ const BOUNDARY_COLORS = [
     'yellow'
 ];
 
-class BooleanPref {
-    constructor(id) {
-        this.input = document.getElementById(id);
-        this.input.addEventListener('change', () => {
-            browser.storage.local.set({
-                [id]: this.input.checked
-            });
-        }, {
-            passive: true
-        });
-    }
-
-    updateValue(val) {
-        this.input.checked = val;
-    }
-}
+const NOTIFICATION_PERM = {
+    permissions: [
+        'notifications'
+    ]
+};
 
 const showError = (error) => {
     let msg;
@@ -42,97 +40,221 @@ const showError = (error) => {
     errorPanel.hidden = false;
 };
 
-const clearStationList = () => {
-    const stationList = document.getElementById("station");
-    while(stationList.firstChildElement) {
-        stationList.firstChildElement.remove();
-    }
-    stationList.disabled = true;
-};
-
-const addToGroup = (groups, group, node) => {
-    if(!groups.hasOwnProperty(group)) {
-        groups[group] = document.createElement("optgroup");
-        groups[group].setAttribute('label', group);
-    }
-    groups[group].append(node);
-};
-
-const fillStationList = () => {
-    Promise.all([
-        browser.storage.local.get('device'),
-        browser.runtime.sendMessage('getstations')
-    ]).then(([ { device }, stations ]) => {
-        clearStationList();
-        const stationList = document.getElementById("station");
-        const groups = {};
-        for(const station of stations) {
-            const selected = station.id === device.id && device.module_id == station.module_id;
-            const value = JSON.stringify(station);
-            const option = new Option(station.module, value, selected, selected);
-            addToGroup(groups, station.group, option);
+class Pref {
+    constructor(id, eventType = 'input', property = 'value') {
+        this.input = document.getElementById(id);
+        if(!this.input) {
+            throw new Error(`input ${id} not found`);
         }
-        for(const group of Object.values(groups)) {
-            stationList.append(group);
-        }
-        stationList.disabled = false;
-    }).catch(showError);
-};
+        this.property = property;
+        this.id = id;
+        this.defaultValue = this.getValue();
 
-const setBoundaryValues = (boundaries) => {
-    for(const color in boundaries) {
-        if(boundaries.hasOwnProperty(color)) {
-            const input = document.getElementById(color);
-            input.value = boundaries[color];
+        this.input.addEventListener(eventType, () => {
+            this.storeValue();
+        }, {
+            passive: true
+        });
+    }
+
+    getValue() {
+        return this.input[this.property];
+    }
+
+    storeValue() {
+        browser.storage.local.set({
+            [this.id]: this.getValue()
+        }).catch(showError);
+    }
+
+    reset() {
+        if(this.defaultValue !== undefined) {
+            this.updateValue(this.defaultValue);
+            this.storeValue();
         }
     }
-};
 
-const saveBoundaries = () => {
-    const boundaries = {};
-    let prevValue = Infinity;
-    for(const color of BOUNDARY_COLORS) {
-        const input = document.getElementById(color);
-        const value = input.valueAsNumber;
-        input.max = prevValue;
-        if(value > prevValue) {
-            input.setCustomValidity("Must be smaller than the value of the previous color");
+    updateValue(val) {
+        if(val !== undefined) {
+            this.input[this.property] = val;
+        }
+    }
+}
+
+class BooleanPref extends Pref {
+    constructor(id) {
+        super(id, 'input', 'checked');
+        if(id.endsWith('Notification')) {
+            browser.permissions.contains(NOTIFICATION_PERM).then((hasPermission) => {
+                if(!hasPermission) {
+                    const requestPermission = () => {
+                        if(this.input.checked) {
+                            browser.permissions.request(NOTIFICATION_PERM).then((gotPermission) => {
+                                if(!gotPermission) {
+                                    throw new Error("Need notification permission to show notifications");
+                                }
+                                else {
+                                    this.input.removeEventListener("click", requestPermission);
+                                }
+                            }).catch(showError);
+                        }
+                    };
+                    this.input.addEventListener('click', requestPermission, {
+                        passive: true
+                    });
+                }
+            }).catch(showError);
+        }
+    }
+
+    updateValue(val) {
+        super.updateValue(!!val);
+    }
+}
+
+class NumberPref extends Pref {
+    constructor(id) {
+        super(id, 'input', 'valueAsNumber');
+    }
+
+    updateValue(val) {
+        if(val !== undefined) {
+            this.input.value = val;
+        }
+    }
+}
+
+class BoundaryPref {
+    constructor() {
+        this.boundaries = BOUNDARY_COLORS.map((c) => {
+            const p = new NumberPref(c);
+            p.storeValue = () => this.storeValue();
+            return p;
+        });
+    }
+
+    reset() {
+        for(const boundary of this.boundaries) {
+            boundary.reset();
+        }
+    }
+
+    storeValue() {
+        const boundaries = {};
+        let prevValue = Infinity;
+        for(const boundary of this.boundaries) {
+            const value = boundary.getValue();
+            boundary.input.max = prevValue;
+            if(value > prevValue) {
+                boundary.input.setCustomValidity("Must be smaller than the value of the previous color");
+            }
+            else {
+                boundary.input.setCustomValidity("");
+                prevValue = value;
+            }
+            boundaries[boundary.id] = value;
+        }
+        return browser.storage.local.set({
+            boundaries
+        }).catch(showError);
+    }
+
+    updateValue(val) {
+        for(const boundary of this.boundaries) {
+            if(val.hasOwnProperty(boundary.id)) {
+                boundary.updateValue(val[boundary.id]);
+            }
+        }
+    }
+}
+
+class StationsList extends Pref {
+    constructor(id) {
+        super(id, 'change');
+        this.hasDelta = document.getElementById("hasDelta");
+    }
+
+    getValue() {
+        const val = super.getValue();
+        if(val) {
+            return JSON.parse(val);
+        }
+    }
+
+    storeValue() {
+        const val = this.getValue();
+        this.hasDelta.hidden = !val.canDelta;
+        super.storeValue();
+    }
+
+    static addToGroup(groups, group, option) {
+        if(!groups.hasOwnProperty(group)) {
+            groups[group] = document.createElement("optgroup");
+            groups[group].setAttribute('label', group);
+        }
+        groups[group].append(option);
+    }
+
+    fill(device) {
+        return browser.runtime.sendMessage('getstations').then((stations) => {
+            this.clear();
+            const groups = {};
+            for(const station of stations) {
+                const selected = station.id === device.id && device.module_id == station.module_id;
+                if(selected) {
+                    this.hasDelta.hidden = !station.canDelta;
+                }
+                const value = JSON.stringify(station);
+                const option = new Option(station.module, value, selected, selected);
+                StationsList.addToGroup(groups, station.group, option);
+            }
+            for(const group of Object.values(groups)) {
+                this.input.append(group);
+            }
+            this.input.disabled = false;
+        });
+    }
+
+    clear() {
+        while(this.input.firstChildElement) {
+            this.input.firstChildElement.remove();
+        }
+        this.input.disabled = true;
+    }
+
+    updateValue(val) {
+        if(val) {
+            this.fill(val).catch(showError);
         }
         else {
-            input.setCustomValidity("");
-            prevValue = value;
+            super.updateValue(JSON.stringify(val));
         }
-        boundaries[color] = value;
     }
-    return browser.storage.local.set({
-        boundaries
-    });
-};
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     const prefs = {};
     const login = document.getElementById("login");
     const interval = document.getElementById("interval");
+    const windowDelta = document.getElementById("windowDelta");
     for(const id of BOOLEAN_PREFS) {
         prefs[id] = new BooleanPref(id);
     }
-    browser.storage.local.get(BOOLEAN_PREFS.concat([ 'token', 'interval', 'boundaries' ])).then((vals) => {
+    for(const id of NUMBER_PREFS) {
+        prefs[id] = new NumberPref(id);
+    }
+    prefs.boundaries = new BoundaryPref();
+    prefs.device = new StationsList('device');
+    browser.storage.local.get(Object.keys(prefs).concat([ 'token' ])).then((vals) => {
         for(const p in prefs) {
             if(prefs.hasOwnProperty(p)) {
-                prefs[p].updateValue(!!vals[p]);
+                prefs[p].updateValue(vals[p]);
             }
         }
         if(vals.token) {
             login.textContent = 'Logout';
-            fillStationList();
         }
-        if(vals.interval) {
-            interval.value = vals.interval;
-        }
-        if(vals.boundaries) {
-            setBoundaryValues(vals.boundaries);
-        }
-    });
+    }).catch(showError);
 
     login.addEventListener("click", async () => {
         const { token } = await browser.storage.local.get('token');
@@ -141,39 +263,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 token: undefined
             });
             login.textContent = 'Login';
-            clearStationList();
+            prefs.device.clear();
         }
         else {
             await browser.runtime.sendMessage('login').catch(showError);
             login.textContent = 'Logout'
-            fillStationList();
+            await prefs.device.fill();
         }
     }, {
         passive: true
     });
 
-    const stationList = document.getElementById("station");
-    stationList.addEventListener('change', (e) => {
-        browser.storage.local.set({
-            device: JSON.parse(stationList.value)
-        }).catch(console.error);
+    document.getElementById("reset").addEventListener("click", () => {
+        for(const p in prefs) {
+            if(prefs.hasOwnProperty(p)) {
+                prefs[p].reset();
+            }
+        }
     }, {
         passive: true
     });
-
-    interval.addEventListener("input", () => {
-        browser.storage.local.set({
-            interval: interval.valueAsNumber
-        });
-    }, {
-        passive: true
-    });
-
-    for(const color of BOUNDARY_COLORS) {
-        document.getElementById(color).addEventListener('input', saveBoundaries, {
-            passive: true
-        });
-    }
 }, {
     passive: true,
     once: true

@@ -1,30 +1,33 @@
 {
-  "manifest_version": 2,
-  "name": "Netatmo CO₂ Indicator",
-  "short_name": "CO₂ Indicator",
-  "version": "1.2.0",
-  "description": "See your CO₂ level in the browser toolbar",
-  "permissions": [
-    "identity",
-    "storage",
-    "alarms",
-    "theme"
-  ],
-  "icons": {
-    "64": "icon.svg"
-  },
-  "browser_action": {
-    "default_title": "Netatmo CO₂ Measurement",
-    "default_icon": "status/gray.svg"
-  },
-  "background": {
-    "scripts": [
-      "config.js",
-      "background.js"
-    ]
-  },
-  "options_ui": {
-    "page": "options.html",
-    "browser_style": true
-  }
+    "manifest_version": 2,
+    "name": "Netatmo CO₂ Indicator",
+    "short_name": "CO₂ Indicator",
+    "version": "1.3.0",
+    "description": "See your CO₂ level in the browser toolbar",
+    "permissions": [
+        "identity",
+        "storage",
+        "alarms",
+        "theme"
+    ],
+    "optional_permissions": [
+        "notifications"
+    ],
+    "icons": {
+        "64": "icon.svg"
+    },
+    "browser_action": {
+        "default_title": "Netatmo CO₂ Measurement",
+        "default_icon": "status/gray.svg"
+    },
+    "background": {
+        "scripts": [
+            "config.js",
+            "background.js"
+        ]
+    },
+    "options_ui": {
+        "page": "options.html",
+        "browser_style": true
+    }
 }
