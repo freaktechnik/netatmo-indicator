@@ -15,7 +15,7 @@
             <input type="number" id="interval" min="5" step="1" value="10" class="browser-style">
         </section>
         <section>
-            <label for="devicey">Station</label>
+            <label for="device">Station</label>
             <select id="device" class="browser-style" disabled>
             </select>
         </section>
@@ -39,6 +39,9 @@
                 <input type="checkbox" id="windowBadge"><label for="windowBadge">Show <samp>!</samp> badge on toolbar button when status is not green and the window could be opened.</label>
                 <br><small>This will replace the ppm value in the badge when it has 4 digits</small>
             </p>
+            <section class="browser-style">
+                <input type="checkbox" id="alwaysWindowBadge"><label for="alwaysWindowBadge">Always show badge when it's cold enough outside and too warm inside</label>
+            </section>
         </section>
         <section>
             <h2>Status boundaries and notifications</h2>
@@ -68,6 +71,11 @@
             </p>
             <section id="hasDelta" class="no-indent">
                 <h3>Window open prompt</h3>
+                <p>
+                    <label for="outdoorModule">Outdoor module</label>
+                    <select id="outdoorModule" class="browser-style" disabled>
+                    </select>
+                </p>
                 <p>
                     <label for="windowDelta">Prompt to open window when showing warning notification and temperature outside lower by at least</label>
                     <input type="number" id="windowDelta" min="1" step="1" value="1" class="browser-style">

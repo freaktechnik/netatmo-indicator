@@ -9,18 +9,22 @@ const DEFAULT_BOUNDARIES = {
     red: 1500
 };
 
-const getOutdoorModule = (device) => {
-    if(device.hasOwnProperty('modules')) {
-        return device.modules.find((m) => m.type === "NAModule1");
-    }
-    return undefined;
-};
 const normalizeModule = (module, station) => {
     const normalized = Object.assign({}, module);
     normalized.station_name = station.station_name;
     normalized.module_id = module._id;
     normalized._id = station._id;
     return normalized;
+};
+const getOutdoorModules = (device) => {
+    if(device.hasOwnProperty('modules')) {
+        return device.modules.filter((m) => m.type === "NAModule1").map((m) => normalizeModule(m, device));
+    }
+    return undefined;
+};
+const findOutdoorModules = (stations) => {
+    const modules = [].concat(...stations.map((s) => getOutdoorModules(s)));
+    return modules.map((m) => formatDevice(m, 'outdoor'));
 };
 const findDevice = (stations, device) => {
     for(const d of stations) {
@@ -37,24 +41,25 @@ const findDevice = (stations, device) => {
     }
     return {};
 };
-const formatDevice = (device, type, canDelta = false) => {
+const formatDevice = (device, type) => {
     const formatted = {
         type,
         id: device._id,
-        co2: device.dashboard_data.CO2,
-        temp: device.dashboard_data.Temperature,
-        canDelta
+        temp: device.dashboard_data.Temperature
     };
+    if(device.dashboard_data.hasOwnProperty('CO2') && type !== 'outdoor') {
+        formatted.co2 = device.dashboard_data.CO2;
+    }
     if(device.hasOwnProperty('module_id')) {
         formatted.module_id = device.module_id;
     }
-    if(type == 'coach') {
+    if(type === 'coach') {
         formatted.group = 'Health coach';
         const name = device.name || device.module_name;
         formatted.module = name;
         formatted.name = name;
     }
-    else if(type == 'weather') {
+    else if(type === 'weather' || type === 'outdoor') {
         formatted.group = device.station_name;
         formatted.module = device.module_name;
         formatted.name = `${device.station_name} - ${device.module_name}`;
@@ -67,14 +72,14 @@ const BUTTON_PREFS = [
     // 'updateTheme', a bit more complicated for resetting
     'onlyWarnTheme',
     'windowBadge',
-    'boundaries'
+    'boundaries',
+    'alwaysWindowBadge'
 ];
 
 const netatmo = {
     REFRESH_ALARM: 'refresh',
     UPDATE_ALARM: 'update',
     hasUpdateLoop: false,
-    canDelta: false,
     async refreshToken() {
         const { refreshToken } = await browser.storage.local.get('refreshToken');
         const body = new URLSearchParams();
@@ -110,7 +115,7 @@ const netatmo = {
     async ensureUpdateLoop() {
         if(!this.hasUpdateLoop) {
             const stations = await this.getStationsList();
-            if(stations.length || this.device) {
+            if(stations.stations.length || this.device) {
                 const { interval } = await browser.storage.local.get({
                     interval: 10
                 });
@@ -142,35 +147,34 @@ const netatmo = {
             const data = await res.json();
             const { body: { devices } } = data;
             const allDevices = [];
+            let outdoorModules = [];
             if(Array.isArray(devices)) {
                 for(const d of devices) {
-                    this.canDelta = false;
                     if(d.modules.length) {
-                        const outdoorModule = getOutdoorModule(d);
-                        if(outdoorModule) {
-                            this.outdoorTemperature = outdoorModule.dashboard_data.Temperature;
-                            this.canDelta = true;
-                        }
                         for(const module of d.modules) {
                             if(module.dashboard_data.hasOwnProperty('CO2')) {
-                                allDevices.push(formatDevice(normalizeModule(module, d), 'weather', this.canDelta));
+                                allDevices.push(formatDevice(normalizeModule(module, d), 'weather'));
                             }
                         }
                     }
-                    allDevices.push(formatDevice(d, 'weather', this.canDelta));
+                    allDevices.push(formatDevice(d, 'weather'));
                 }
+                outdoorModules = findOutdoorModules(devices);
             }
-            return allDevices;
+            return {
+                stations: allDevices,
+                outdoorModules
+            };
         }
         throw new Error("Failed to fetch station data");
     },
-    async getStationData() {
+    async fetchStationData(id) {
         if(!this.token) {
             throw new Error("Not authorized");
         }
         const body = new URLSearchParams();
         body.append('access_token', this.token);
-        body.append('device_id', this.device.id);
+        body.append('device_id', id);
         const res = await fetch(`${API_BASE}api/getstationsdata`, {
             method: 'POST',
             body
@@ -179,19 +183,31 @@ const netatmo = {
             const data = await res.json();
             const { body: { devices } } = data;
             if(Array.isArray(devices)) {
-                const device = findDevice(devices, this.device);
-                let outdoorModuleParent = device;
-                if(device.hasOwnProperty('module_id')) {
-                    outdoorModuleParent = findDevice(devices, {
-                        id: device._id
-                    });
-                }
-                const outdoorModule = getOutdoorModule(outdoorModuleParent);
-                const newDevice = formatDevice(device, 'weather', !!outdoorModule);
-                return this.setState(newDevice, true, outdoorModule);
+                return devices;
             }
+            return [];
         }
         throw new Error("Failed to update station data");
+    },
+    async getStationData() {
+        const devices = await this.fetchStationData(this.device.id);
+        const device = findDevice(devices, this.device);
+        const newDevice = formatDevice(device, 'weather');
+        let outdoorModule;
+        if(this.outdoorModule) {
+            let outdoorModuleParent = device;
+            if(newDevice.id !== this.outdoorModule.id) {
+                outdoorModuleParent = await this.fetchStationData(this.outdoorModule.id);
+            }
+            else if(device.hasOwnProperty('module_id')) {
+                outdoorModuleParent = findDevice(devices, {
+                    id: this.outdoorModule.id
+                });
+            }
+            const rawOutdoorModule = findDevice([ outdoorModuleParent ], this.outdoorModule);
+            outdoorModule = formatDevice(rawOutdoorModule, 'outdoor');
+        }
+        return this.setState(newDevice, true, outdoorModule);
     },
     async getHomeCoachesData() {
         if(!this.token) {
@@ -230,7 +246,13 @@ const netatmo = {
             if(Array.isArray(devices)) {
                 const d = findDevice(devices, this.device);
                 const newDevice = formatDevice(d, 'coach');
-                return this.setState(newDevice);
+                let outdoorModule;
+                if(this.outdoorModule) {
+                    const devices = await this.fetchStationData(this.outdoorModule.id);
+                    const rawOutdoorModule = findDevice(devices, this.outdoorModule);
+                    outdoorModule = formatDevice(rawOutdoorModule, 'outdoor');
+                }
+                return this.setState(newDevice, true, outdoorModule);
             }
         }
         throw new Error("failed to update health coach data");
@@ -244,30 +266,34 @@ const netatmo = {
         }
     },
     async restoreState(stations) {
-        const { device } = await browser.storage.local.get('device');
+        const { device, outdoorModule } = await browser.storage.local.get([ 'device', 'outdoorModule' ]);
         if(device) {
-            let updatedDevice = stations.find((d) => d.id === device.id);
-            if(!updatedDevice) {
-                updatedDevice = device;
+            let updatedDevice = stations.stations.find((d) => d.id === device.id) || device;
+            let updatedOutdoor;
+            if(outdoorModule) {
+                updatedOutdoor = stations.outdoorModules.find((m) => m.id === outdoorModule.id) || outdoorModule;
             }
-            await this.setState(device, false);
+            else {
+                updatedOutdoor = stations.outdoorModules[0];
+            }
+            await this.setState(device, !outdoorModule, updatedOutdoor);
         }
-        else if(stations && stations.length) {
-            await this.setState(stations[0], false);
+        else if(stations && stations.stations.length) {
+            let outdoor;
+            if(stations.outdoorModules.length) {
+                outdoor = outdoorModule || stations.outdoorModules[0];
+            }
+            await this.setState(stations.stations[0], true, outdoor);
         }
     },
     async setState(device, store = true, outdoorModule) {
         const prevCO2 = this.device ? this.device.co2 : -1;
         this.device = device;
-        if(outdoorModule) {
-            this.outdoorTemperature = outdoorModule.dashboard_data.Temperature;
-        }
-        else if(store) {
-            this.outdoorTemperature = undefined;
-        }
+        this.outdoorModule = outdoorModule;
         if(store) {
             await browser.storage.local.set({
-                device
+                device,
+                outdoorModule
             });
         }
         await Promise.all([
@@ -326,7 +352,8 @@ const netatmo = {
             boundaries,
             windowMin,
             windowDelta,
-            windowBadge
+            windowBadge,
+            alwaysWindowBadge
         } = await browser.storage.local.get({
             updateTheme: false,
             ppmOnBadge: false,
@@ -334,7 +361,8 @@ const netatmo = {
             boundaries: DEFAULT_BOUNDARIES,
             windowMin: 24,
             windowDelta: 1,
-            windowBadge: false
+            windowBadge: false,
+            alwaysWindowBadge: false
         });
         await browser.browserAction.setIcon({
             path: this.getImage(boundaries)
@@ -346,7 +374,7 @@ const netatmo = {
         if(ppmOnBadge && this.device.co2 >= 0) {
             badgeText += this.device.co2.toString(10);
         }
-        if(windowBadge && this.device.canDelta && this.device.co2 >= boundaries.yellow && this.device.temp >= windowMin && this.device.temp - this.outdoorTemperature >= windowDelta) {
+        if(windowBadge && this.outdoorModule && (this.device.co2 >= boundaries.yellow || alwaysWindowBadge) && this.device.temp >= windowMin && this.device.temp - this.outdoorModule.temp >= windowDelta) {
             if(badgeText.length < 4) {
                 badgeText += '!';
             }
@@ -422,7 +450,7 @@ const netatmo = {
             else if(prevCO2 >= prefs.boundaries.yellow && this.device.co2 < prefs.boundaries.yellow && prefs.greenNotification) {
                 notifSpec.title = `CO₂ back to below ${prefs.boundaries.yellow}ppm`;
             }
-            if(shouldLowerCO2 && this.device.canDelta && this.device.temp >= prefs.windowMin && this.device.temp - this.outdoorTemperature >= prefs.windowDelta) {
+            if(shouldLowerCO2 && this.outdoorModule && this.device.temp >= prefs.windowMin && this.device.temp - this.outdoorModule.temp >= prefs.windowDelta) {
                 notifSpec.message += ". Open a window, it's cooler outside!";
             }
             if(notifSpec.title) {
@@ -464,8 +492,7 @@ const netatmo = {
         const p = browser.alarms.clearAll();
         this.hasUpdateLoop = false;
         this.token = undefined;
-        this.outdoorTemperature = undefined;
-        const p2 = this.setState(undefined);
+        const p2 = this.setState(undefined, true, undefined);
         return Promise.all([ p, p2 ]);
     },
     async getStationsList() {
@@ -473,8 +500,11 @@ const netatmo = {
             this.getStationsData(),
             this.getHomeCoachesData()
         ]);
-        const allDevices = weather.concat(healthcoach);
-        return allDevices;
+        const allDevices = healthcoach.concat(weather.stations);
+        return {
+            stations: allDevices,
+            outdoorModules: weather.outdoorModules
+        };
     },
     async init() {
         browser.alarms.onAlarm.addListener((alarm) => {
@@ -490,27 +520,32 @@ const netatmo = {
                 url: 'https://my.netatmo.com'
             });
         });
-        browser.storage.onChanged.addListener((changes, area) => {
+        browser.storage.onChanged.addListener(async (changes, area) => {
             if(area === 'local') {
-                if(BUTTON_PREFS.some((p) => changes.hasOwnProperty(p)) || (changes.hasOwnProperty('updateTheme') && changes.updateTheme.newValue)) {
-                    this.updateButton().catch(console.error);
-                }
                 if(changes.hasOwnProperty('updateTheme') && changes.updateTheme.oldValue && !changes.updateTheme.newValue) {
                     browser.theme.reset();
                 }
-                if(changes.hasOwnProperty('token') && !changes.token.newValue) {
-                    this.reset().catch(console.error);
-                }
                 if(changes.hasOwnProperty('device') && (changes.device.newValue.id != changes.device.oldValue.id || changes.device.newValue.module_id != changes.device.oldValue.module_id)) {
-                    this.setState(changes.device.newValue, false);
+                    // Need to await so outdoor module doesn't clash with this.
+                    await this.setState(changes.device.newValue, false, this.outdoorModule).catch(console.error);
                     this.ensureUpdateLoop();
                 }
+                if(changes.hasOwnProperty('outdoorModule') && (changes.outdoorModule.newValue.id != changes.outdoorModule.oldValue.id)) {
+                    await this.setState(this.device, false, changes.outdoorModule.newValue).catch(console.error);
+                }
+                // Don't have to udpate the button if the state has changed.
+                else if(BUTTON_PREFS.some((p) => changes.hasOwnProperty(p)) || (changes.hasOwnProperty('updateTheme') && changes.updateTheme.newValue)) {
+                    this.updateButton().catch(console.error);
+                }
                 if(changes.hasOwnProperty('interval') && this.hasUpdateLoop) {
-                    browser.alarms.clear(this.UPDATE_ALARM).then(() => {
+                    await browser.alarms.clear(this.UPDATE_ALARM).then(() => {
                         browser.alarms.create(this.UPDATE_ALARM, {
                             periodInMinutes: changes.interval.newValue
                         });
                     }).catch(console.error);
+                }
+                if(changes.hasOwnProperty('token') && !changes.token.newValue) {
+                    this.reset().catch(console.error);
                 }
             }
         });

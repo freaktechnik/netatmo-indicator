@@ -8,7 +8,8 @@ const BOOLEAN_PREFS = [
     'orangeNotification',
     'yellowNotification',
     'greenNotification',
-    'windowBadge'
+    'windowBadge',
+    'alwaysWindowBadge'
 ];
 
 const NUMBER_PREFS = [
@@ -41,6 +42,8 @@ const showError = (error) => {
     errorPanel.textContent = msg;
     errorPanel.hidden = false;
 };
+
+const devices = browser.runtime.sendMessage('getstations');
 
 class Pref {
     constructor(id, eventType = 'input', property = 'value') {
@@ -171,9 +174,9 @@ class BoundaryPref {
 }
 
 class StationsList extends Pref {
-    constructor(id) {
+    constructor(id, sourceName) {
         super(id, 'change');
-        this.hasDelta = document.getElementById("hasDelta");
+        this.sourceName = sourceName;
     }
 
     getValue() {
@@ -181,17 +184,6 @@ class StationsList extends Pref {
         if(val) {
             return JSON.parse(val);
         }
-    }
-
-    storeValue() {
-        const val = this.getValue();
-        if(val) {
-            this.hasDelta.hidden = !val.canDelta;
-        }
-        else {
-            this.hasDelta.hidden = true;
-        }
-        super.storeValue();
     }
 
     static addToGroup(groups, group, option) {
@@ -202,24 +194,20 @@ class StationsList extends Pref {
         groups[group].append(option);
     }
 
-    fill(device) {
-        return browser.runtime.sendMessage('getstations').then((stations) => {
-            this.clear();
-            const groups = {};
-            for(const station of stations) {
-                const selected = station.id === device.id && device.module_id == station.module_id;
-                if(selected) {
-                    this.hasDelta.hidden = !station.canDelta;
-                }
-                const value = JSON.stringify(station);
-                const option = new Option(station.module, value, selected, selected);
-                StationsList.addToGroup(groups, station.group, option);
-            }
-            for(const group of Object.values(groups)) {
-                this.input.append(group);
-            }
-            this.input.disabled = false;
-        });
+    async fill(device = {}) {
+        this.clear();
+        const groups = {};
+        const { [this.sourceName]: stations } = await devices;
+        for(const station of stations) {
+            const selected = station.id === device.id && device.module_id == station.module_id;
+            const value = JSON.stringify(station);
+            const option = new Option(station.module, value, selected, selected);
+            StationsList.addToGroup(groups, station.group, option);
+        }
+        for(const group of Object.values(groups)) {
+            this.input.append(group);
+        }
+        this.input.disabled = false;
     }
 
     clear() {
@@ -230,12 +218,16 @@ class StationsList extends Pref {
     }
 
     updateValue(val) {
-        if(val) {
-            this.fill(val).catch(showError);
-        }
-        else {
-            super.updateValue(val);
-        }
+        this.fill(val).catch(showError);
+    }
+}
+
+class OutdoorList extends StationsList {
+    constructor(id) {
+        super(id, 'outdoorModules');
+        devices.then((dev) => {
+            document.getElementById("hasDelta").hidden = !dev.outdoorModules.length;
+        });
     }
 }
 
@@ -251,7 +243,8 @@ document.addEventListener('DOMContentLoaded', () => {
         prefs[id] = new NumberPref(id);
     }
     prefs.boundaries = new BoundaryPref();
-    prefs.device = new StationsList('device');
+    prefs.device = new StationsList('device', 'stations');
+    prefs.outdoorModule = new OutdoorList('outdoorModule');
     browser.storage.local.get(Object.keys(prefs).concat([ 'token' ])).then((vals) => {
         for(const p in prefs) {
             if(prefs.hasOwnProperty(p)) {
@@ -271,11 +264,15 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             login.textContent = 'Login';
             prefs.device.clear();
+            prefs.outdoorModule.clear();
         }
         else {
             await browser.runtime.sendMessage('login').catch(showError);
-            login.textContent = 'Logout'
-            await prefs.device.fill();
+            login.textContent = 'Logout';
+            await Promise.all([
+                prefs.device.fill(),
+                prefs.outdoorModule.fill()
+            ]);
         }
     }, {
         passive: true
