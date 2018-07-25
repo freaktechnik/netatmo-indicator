@@ -357,16 +357,16 @@ const netatmo = {
           title: this.device ? `${this.device.name}: ${this.device.co2}ppm` : 'Netatmo CO₂ Measurement'
         });
         let badgeText = '';
-        if(ppmOnBadge && this.device.co2 >= 0) {
-            badgeText += this.device.co2.toString(10);
-        }
         if(windowBadge && this.outdoorModule && (this.device.co2 >= boundaries.yellow || alwaysWindowBadge) && this.device.temp >= windowMin && this.device.temp - this.outdoorModule.temp >= windowDelta) {
-            if(badgeText.length < 4) {
+            if(this.device.co2 < 1000) {
                 badgeText += '!';
             }
             else {
                 badgeText = '!';
             }
+        }
+        if(ppmOnBadge && this.device.co2 >= 0) {
+            badgeText += this.device.co2.toString(10);
         }
         if(badgeText.length) {
             await Promise.all([
@@ -525,9 +525,11 @@ const netatmo = {
                 }
                 if(changes.hasOwnProperty('interval') && this.hasUpdateLoop) {
                     await browser.alarms.clear(this.UPDATE_ALARM).then(() => {
-                        browser.alarms.create(this.UPDATE_ALARM, {
-                            periodInMinutes: changes.interval.newValue
-                        });
+                        if(changes.interval.newValue) {
+                            browser.alarms.create(this.UPDATE_ALARM, {
+                                periodInMinutes: changes.interval.newValue
+                            });
+                        }
                     }).catch(console.error);
                 }
                 if(changes.hasOwnProperty('token') && !changes.token.newValue) {
