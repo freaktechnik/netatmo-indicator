@@ -20,7 +20,7 @@ const getOutdoorModules = (device) => {
     if(device.hasOwnProperty('modules')) {
         return device.modules.filter((m) => m.type === "NAModule1").map((m) => normalizeModule(m, device));
     }
-    return undefined;
+    return [];
 };
 const findOutdoorModules = (stations) => {
     const modules = [].concat(...stations.map((s) => getOutdoorModules(s)));
@@ -133,48 +133,15 @@ const netatmo = {
             }
         }
     },
-    async getStationsData() {
-        if(!this.token) {
-            throw new Error("Not authorized");
-        }
-        const body = new URLSearchParams();
-        body.append('access_token', this.token);
-        const res = await fetch(`${API_BASE}api/getstationsdata`, {
-            method: 'POST',
-            body
-        });
-        if(res.ok) {
-            const data = await res.json();
-            const { body: { devices } } = data;
-            const allDevices = [];
-            let outdoorModules = [];
-            if(Array.isArray(devices)) {
-                for(const d of devices) {
-                    if(d.modules.length) {
-                        for(const module of d.modules) {
-                            if(module.dashboard_data.hasOwnProperty('CO2')) {
-                                allDevices.push(formatDevice(normalizeModule(module, d), 'weather'));
-                            }
-                        }
-                    }
-                    allDevices.push(formatDevice(d, 'weather'));
-                }
-                outdoorModules = findOutdoorModules(devices);
-            }
-            return {
-                stations: allDevices,
-                outdoorModules
-            };
-        }
-        throw new Error("Failed to fetch station data");
-    },
     async fetchStationData(id) {
         if(!this.token) {
             throw new Error("Not authorized");
         }
         const body = new URLSearchParams();
         body.append('access_token', this.token);
-        body.append('device_id', id);
+        if(id) {
+            body.append('device_id', id);
+        }
         const res = await fetch(`${API_BASE}api/getstationsdata`, {
             method: 'POST',
             body
@@ -188,6 +155,25 @@ const netatmo = {
             return [];
         }
         throw new Error("Failed to update station data");
+    },
+    async getStationsData() {
+        const devices = await this.fetchStationData();
+        const allDevices = [];
+        for(const d of devices) {
+            if(d.modules.length) {
+                for(const module of d.modules) {
+                    if(module.dashboard_data.hasOwnProperty('CO2')) {
+                        allDevices.push(formatDevice(normalizeModule(module, d), 'weather'));
+                    }
+                }
+            }
+            allDevices.push(formatDevice(d, 'weather'));
+        }
+        outdoorModules = findOutdoorModules(devices);
+        return {
+            stations: allDevices,
+            outdoorModules
+        };
     },
     async getStationData() {
         const devices = await this.fetchStationData(this.device.id);
