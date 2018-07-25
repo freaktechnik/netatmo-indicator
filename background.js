@@ -169,7 +169,7 @@ const netatmo = {
             }
             allDevices.push(formatDevice(d, 'weather'));
         }
-        outdoorModules = findOutdoorModules(devices);
+        const outdoorModules = findOutdoorModules(devices);
         return {
             stations: allDevices,
             outdoorModules
