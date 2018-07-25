@@ -211,8 +211,8 @@ class StationsList extends Pref {
     }
 
     clear() {
-        while(this.input.firstChildElement) {
-            this.input.firstChildElement.remove();
+        while(this.input.firstElementChild) {
+            this.input.firstElementChild.remove();
         }
         this.input.disabled = true;
     }
@@ -247,7 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
     prefs.outdoorModule = new OutdoorList('outdoorModule');
     browser.storage.local.get(Object.keys(prefs).concat([ 'token' ])).then((vals) => {
         for(const p in prefs) {
-            if(prefs.hasOwnProperty(p)) {
+            if(prefs.hasOwnProperty(p) && (vals.token || (p !== 'device' && p !== 'outdoorModule'))) {
                 prefs[p].updateValue(vals[p]);
             }
         }
@@ -269,9 +269,13 @@ document.addEventListener('DOMContentLoaded', () => {
         else {
             await browser.runtime.sendMessage('login').catch(showError);
             login.textContent = 'Logout';
+            const { device, outdoorModule } = await browser.storage.local.get([
+                'device',
+                'outdoorModule'
+            ]);
             await Promise.all([
-                prefs.device.fill(),
-                prefs.outdoorModule.fill()
+                prefs.device.fill(device),
+                prefs.outdoorModule.fill(outdoorModule)
             ]);
         }
     }, {

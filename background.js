@@ -95,6 +95,9 @@ const netatmo = {
             const data = await res.json();
             this.storeToken(data.access_token, data.expires_in * 1000, data.refresh_token);
         }
+        else {
+            this.reset();
+        }
     },
     async storeToken(token, expiresIn, refreshToken) {
         const date = Date.now() + expiresIn;
@@ -288,6 +291,9 @@ const netatmo = {
         ]);
     },
     getImage(boundaries) {
+        if(!this.device) {
+            return 'status/gray.svg';
+        }
         if(this.device.co2 >= boundaries.red) {
             return 'status/red.svg';
         }
