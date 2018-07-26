@@ -9,6 +9,8 @@ const DEFAULT_BOUNDARIES = {
     red: 1500
 };
 
+//TODO add alternative weather API to use instead of an outdoor module.
+
 const normalizeModule = (module, station) => {
     const normalized = Object.assign({}, module);
     normalized.station_name = station.station_name;
@@ -81,21 +83,25 @@ const netatmo = {
     UPDATE_ALARM: 'update',
     hasUpdateLoop: false,
     async refreshToken() {
-        const { refreshToken } = await browser.storage.local.get('refreshToken');
-        const body = new URLSearchParams();
-        body.append('grant_type', 'refresh_token');
-        body.append('refresh_token', refreshToken);
-        body.append('client_id', clientToken);
-        body.append('client_secret', clientSecret);
-        const res = await fetch(`${API_BASE}oauth2/token`, {
-            method: 'POST',
-            body
-        });
-        if(res.ok) {
-            const data = await res.json();
-            this.storeToken(data.access_token, data.expires_in * 1000, data.refresh_token);
+        try {
+            const { refreshToken } = await browser.storage.local.get('refreshToken');
+            const body = new URLSearchParams();
+            body.append('grant_type', 'refresh_token');
+            body.append('refresh_token', refreshToken);
+            body.append('client_id', clientToken);
+            body.append('client_secret', clientSecret);
+            const res = await fetch(`${API_BASE}oauth2/token`, {
+                method: 'POST',
+                body
+            });
+            if(res.ok) {
+                const data = await res.json();
+                return this.storeToken(data.access_token, data.expires_in * 1000, data.refresh_token);
+            }
+            throw new Error("Could not fetch new token");
         }
-        else {
+        catch(e) {
+            console.error(e);
             this.reset();
         }
     },
@@ -129,7 +135,7 @@ const netatmo = {
                     periodInMinutes: interval,
                 };
                 if(this.device) {
-                    alarmSpec.when = Date.now();
+                    alarmSpec.when = Date.now() + 100;
                 }
                 browser.alarms.create(this.UPDATE_ALARM, alarmSpec);
                 this.hasUpdateLoop = true;
@@ -454,7 +460,7 @@ const netatmo = {
         const authState = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(HEX);
         const scopes = 'read_station+read_homecoach';
         const url = await browser.identity.launchWebAuthFlow({
-            url: `${API_BASE}oauth2/authorize?client_id=${clientToken}&client_secret=${clientSecret}&redirect_uri=${redirectUri}&state=${authState}&scope=${scopes}`,
+            url: `${API_BASE}oauth2/authorize?client_id=${clientToken}&redirect_uri=${redirectUri}&state=${authState}&scope=${scopes}`,
             interactive: true
         });
         const parsedUrl = new URL(url);
