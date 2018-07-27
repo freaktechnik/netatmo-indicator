@@ -1,49 +1,52 @@
 "use strict";
 
+/* This Source Code Form is subject to the terms of the Mozilla Public License,
+ * v. 2.0. If a copy of the MPL was not distributed with this file, You can
+ * obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
 const BOOLEAN_PREFS = [
-    'updateTheme',
-    'ppmOnBadge',
-    'onlyWarnTheme',
-    'redNotification',
-    'orangeNotification',
-    'yellowNotification',
-    'greenNotification',
-    'windowBadge',
-    'alwaysWindowBadge'
-];
+        'updateTheme',
+        'ppmOnBadge',
+        'onlyWarnTheme',
+        'redNotification',
+        'orangeNotification',
+        'yellowNotification',
+        'greenNotification',
+        'windowBadge',
+        'alwaysWindowBadge'
+    ],
 
-const NUMBER_PREFS = [
-    'interval',
-    'windowDelta',
-    'windowMin'
-];
+    NUMBER_PREFS = [
+        'interval',
+        'windowDelta',
+        'windowMin'
+    ],
 
-const BOUNDARY_COLORS = [
-    'red',
-    'orange',
-    'yellow'
-];
+    BOUNDARY_COLORS = [
+        'red',
+        'orange',
+        'yellow'
+    ],
 
-const NOTIFICATION_PERM = {
-    permissions: [
-        'notifications'
-    ]
-};
+    NOTIFICATION_PERM = {
+        permissions: [ 'notifications' ]
+    },
 
-const showError = (error) => {
-    let msg;
-    if(error instanceof Error) {
-        msg = error.message;
-    }
-    else {
-        msg = error;
-    }
-    const errorPanel = document.getElementById("error");
-    errorPanel.textContent = msg;
-    errorPanel.hidden = false;
-};
+    showError = (error) => {
+        let msg;
+        if(error instanceof Error) {
+            msg = error.message;
+        }
+        else {
+            msg = error;
+        }
+        const errorPanel = document.getElementById("error");
+        errorPanel.textContent = msg;
+        errorPanel.hidden = false;
+    },
 
-const devices = browser.runtime.sendMessage('getstations');
+    devices = browser.runtime.sendMessage('getstations');
 
 class Pref {
     constructor(id, eventType = 'input', property = 'value') {
@@ -101,14 +104,16 @@ class BooleanPref extends Pref {
                                 else {
                                     this.input.removeEventListener("click", requestPermission);
                                 }
-                            }).catch(showError);
+                            })
+                                .catch(showError);
                         }
                     };
                     this.input.addEventListener('click', requestPermission, {
                         passive: true
                     });
                 }
-            }).catch(showError);
+            })
+                .catch(showError);
         }
     }
 
@@ -174,6 +179,14 @@ class BoundaryPref {
 }
 
 class StationsList extends Pref {
+    static addToGroup(groups, group, option) {
+        if(!groups.hasOwnProperty(group)) {
+            groups[group] = document.createElement("optgroup");
+            groups[group].setAttribute('label', group);
+        }
+        groups[group].append(option);
+    }
+
     constructor(id, sourceName) {
         super(id, 'change');
         this.sourceName = sourceName;
@@ -186,22 +199,14 @@ class StationsList extends Pref {
         }
     }
 
-    static addToGroup(groups, group, option) {
-        if(!groups.hasOwnProperty(group)) {
-            groups[group] = document.createElement("optgroup");
-            groups[group].setAttribute('label', group);
-        }
-        groups[group].append(option);
-    }
-
     async fill(device = {}) {
         this.clear();
-        const groups = {};
-        const { [this.sourceName]: stations } = await devices;
+        const groups = {},
+            { [this.sourceName]: stations } = await devices;
         for(const station of stations) {
-            const selected = station.id === device.id && device.module_id == station.module_id;
-            const value = JSON.stringify(station);
-            const option = new Option(station.module, value, selected, selected);
+            const selected = station.id === device.id && device.module_id == station.module_id,
+                value = JSON.stringify(station),
+                option = new Option(station.module, value, selected, selected);
             StationsList.addToGroup(groups, station.group, option);
         }
         for(const group of Object.values(groups)) {
@@ -227,15 +232,14 @@ class OutdoorList extends StationsList {
         super(id, 'outdoorModules');
         devices.then((dev) => {
             document.getElementById("hasDelta").hidden = !dev.outdoorModules.length;
-        });
+        })
+            .catch(showError);
     }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const prefs = {};
-    const login = document.getElementById("login");
-    const interval = document.getElementById("interval");
-    const windowDelta = document.getElementById("windowDelta");
+    const prefs = {},
+        login = document.getElementById("login");
     for(const id of BOOLEAN_PREFS) {
         prefs[id] = new BooleanPref(id);
     }
@@ -254,7 +258,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if(vals.token) {
             login.textContent = 'Logout';
         }
-    }).catch(showError);
+    })
+        .catch(showError);
 
     login.addEventListener("click", async () => {
         const { token } = await browser.storage.local.get('token');
@@ -269,7 +274,9 @@ document.addEventListener('DOMContentLoaded', () => {
         else {
             await browser.runtime.sendMessage('login').catch(showError);
             login.textContent = 'Logout';
-            const { device, outdoorModule } = await browser.storage.local.get([
+            const {
+                device, outdoorModule
+            } = await browser.storage.local.get([
                 'device',
                 'outdoorModule'
             ]);
