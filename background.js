@@ -284,17 +284,21 @@ const HEX = 16,
                 if(outdoorModule) {
                     updatedOutdoor = stations.outdoorModules.find((m) => m.id === outdoorModule.id) || outdoorModule;
                 }
-                else {
+                else if(stations.outdoorModules.length) {
                     updatedOutdoor = stations.outdoorModules[FIRST];
                 }
                 await this.setState(updatedDevice, !outdoorModule, updatedOutdoor);
             }
             else if(stations && stations.stations.length) {
-                let outdoor;
-                if(stations.outdoorModules.length) {
-                    outdoor = outdoorModule || stations.outdoorModules[FIRST];
+                let outdoor = outdoorModule;
+                if(stations.outdoorModules.length && !outdoor) {
+                    outdoor = stations.outdoorModules[FIRST];
                 }
-                await this.setState(stations.stations[FIRST], true, outdoor);
+                let station;
+                if(stations.stations.length) {
+                    station = stations.stations[FIRST];
+                }
+                await this.setState(station, true, outdoor);
             }
         },
         async setState(device, store = true, outdoorModule) {
@@ -604,7 +608,7 @@ const HEX = 16,
                     permissions: [ 'notifications' ]
                 }),
                 addListener = () => browser.notifications.onShown.addListener(() => {
-                    browser.runtime.sendMessage("@notification-sound", "new-notification");
+                    browser.runtime.sendMessage("@notification-sound", "new-notification").catch(console.warn);
                 });
             if(hasNotifs) {
                 addListener();
