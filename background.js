@@ -20,6 +20,9 @@ const HEX = 16,
         normalized._id = station._id;
         return normalized;
     },
+    isSameDevice = (a, b) => {
+        return a.id === b.id && a.module_id === b.module_id;
+    },
     getOutdoorModules = (device) => {
         if(device.hasOwnProperty('modules')) {
             return device.modules.filter((m) => m.type === "NAModule1").map((m) => normalizeModule(m, device));
@@ -279,10 +282,10 @@ const HEX = 16,
                 'outdoorModule'
             ]);
             if(device) {
-                const updatedDevice = stations.stations.find((d) => d.id === device.id) || device;
+                const updatedDevice = stations.stations.find((d) => isSameDevice(d, device)) || device;
                 let updatedOutdoor;
                 if(outdoorModule) {
-                    updatedOutdoor = stations.outdoorModules.find((m) => m.id === outdoorModule.id) || outdoorModule;
+                    updatedOutdoor = stations.outdoorModules.find((m) => isSameDevice(m, outdoorModule)) || outdoorModule;
                 }
                 else if(stations.outdoorModules.length) {
                     updatedOutdoor = stations.outdoorModules[FIRST];
@@ -547,12 +550,12 @@ const HEX = 16,
                     if(changes.hasOwnProperty('updateTheme') && changes.updateTheme.oldValue && !changes.updateTheme.newValue) {
                         browser.theme.reset();
                     }
-                    if(changes.hasOwnProperty('device') && (changes.device.newValue.id != changes.device.oldValue.id || changes.device.newValue.module_id != changes.device.oldValue.module_id)) {
+                    if(changes.hasOwnProperty('device') && !isSameDevice(changes.device.newValue, changes.device.oldValue)) {
                         // Need to await so outdoor module doesn't clash with this.
                         await this.setState(changes.device.newValue, false, this.outdoorModule).catch(console.error);
                         this.ensureUpdateLoop();
                     }
-                    if(changes.hasOwnProperty('outdoorModule') && (changes.outdoorModule.newValue.id != changes.outdoorModule.oldValue.id)) {
+                    if(changes.hasOwnProperty('outdoorModule') && !isSameDevice(changes.outdoorModule.newValue, changes.outdoorModule.oldValue)) {
                         await this.setState(this.device, false, changes.outdoorModule.newValue).catch(console.error);
                     }
                     // Don't have to udpate the button if the state has changed.
