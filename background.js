@@ -20,9 +20,7 @@ const HEX = 16,
         normalized._id = station._id;
         return normalized;
     },
-    isSameDevice = (a, b) => {
-        return a.id === b.id && a.module_id === b.module_id;
-    },
+    isSameDevice = (a, b) => a.id === b.id && a.module_id === b.module_id,
     getOutdoorModules = (device) => {
         if(device.hasOwnProperty('modules')) {
             return device.modules.filter((m) => m.type === "NAModule1").map((m) => normalizeModule(m, device));
