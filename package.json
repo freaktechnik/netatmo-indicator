@@ -9,7 +9,8 @@
     "lint:ec": "eclint check $(git ls-files)",
     "lint:css": "stylelint *.css",
     "test": "npm run lint:js && npm run lint:webext && npm run lint:ec",
-    "build": "web-ext build"
+    "build": "web-ext build",
+    "start": "web-ext run"
   },
   "repository": {
     "type": "git",

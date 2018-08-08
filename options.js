@@ -115,9 +115,34 @@ class BooleanPref extends Pref {
             })
                 .catch(showError);
         }
+
+        const nextSection = this.input.parentElement.nextElementSibling;
+        this.childSection = undefined;
+        if(nextSection && nextSection.tagName.toLowerCase() === 'section' && !nextSection.classList.contains('no-indent')) {
+            this.childSection = nextSection;
+        }
+    }
+
+    updateSubsections() {
+        if(this.childSection) {
+            const disabled = !this.input.checked;
+            this.childSection.classList.toggle('disabled', disabled);
+            const inputs = this.childSection.querySelectorAll('input');
+            if(inputs && inputs.length) {
+                for(const input of inputs.values()) {
+                    input.disabled = disabled;
+                }
+            }
+        }
+    }
+
+    storeValue(...args) {
+        this.updateSubsections();
+        return super.storeValue(...args);
     }
 
     updateValue(val) {
+        this.updateSubsections();
         super.updateValue(!!val);
     }
 }
@@ -251,7 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
     prefs.outdoorModule = new OutdoorList('outdoorModule');
     browser.storage.local.get(Object.keys(prefs).concat([ 'token' ])).then((vals) => {
         for(const p in prefs) {
-            if(prefs.hasOwnProperty(p) && (vals.token || (p !== 'device' && p !== 'outdoorModule'))) {
+            if(prefs.hasOwnProperty(p) && vals.hasOwnProperty(p) && (vals.token || (p !== 'device' && p !== 'outdoorModule'))) {
                 prefs[p].updateValue(vals[p]);
             }
         }

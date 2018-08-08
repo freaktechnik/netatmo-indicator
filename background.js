@@ -314,10 +314,12 @@ const HEX = 16,
                     outdoorModule
                 });
             }
-            await Promise.all([
-                this.updateButton(),
-                this.showNotification(prevCO2)
-            ]);
+            if(this.device) {
+                await Promise.all([
+                    this.updateButton(),
+                    this.showNotification(prevCO2)
+                ]);
+            }
         },
         getImage(boundaries) {
             if(!this.device) {
@@ -559,7 +561,7 @@ const HEX = 16,
                         await this.setState(this.device, false, changes.outdoorModule.newValue).catch(console.error);
                     }
                     // Don't have to udpate the button if the state has changed.
-                    else if(this.BUTTON_PREFS.some((p) => changes.hasOwnProperty(p)) || (changes.hasOwnProperty('updateTheme') && changes.updateTheme.newValue)) {
+                    else if(this.device && this.BUTTON_PREFS.some((p) => changes.hasOwnProperty(p)) || (changes.hasOwnProperty('updateTheme') && changes.updateTheme.newValue)) {
                         this.updateButton().catch(console.error);
                     }
                     if(changes.hasOwnProperty('interval') && this.hasUpdateLoop) {
@@ -595,7 +597,12 @@ const HEX = 16,
                 'expires'
             ]);
             if(!token) {
-                await this.login();
+                try {
+                    await this.login();
+                }
+                catch(e) {
+                    console.warn("OAuth aborted");
+                }
             }
             else {
                 this.token = token;

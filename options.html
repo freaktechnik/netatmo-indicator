@@ -19,13 +19,15 @@
             <select id="device" class="browser-style" disabled>
             </select>
         </section>
-        <section class="browser-style">
+        <section>
             <h2>Dynamic theme</h2>
-            <input type="checkbox" id="updateTheme">
-            <label for="updateTheme">Apply color to browser window</label>
-            <br><small>Does not work well with the built-in dark theme of Firefox due to a platform bug.</small>
-            <section class="browser-style">
-                <input type="checkbox" id="onlyWarnTheme">
+            <p class="browser-style">
+                <input type="checkbox" id="updateTheme">
+                <label for="updateTheme">Apply color to browser window</label>
+                <br><small>Does not work well with the built-in dark theme of Firefox due to a platform bug.</small>
+            </p>
+            <section class="browser-style disabled">
+                <input type="checkbox" id="onlyWarnTheme" disabled>
                 <label for="onlyWarnTheme">Only apply color when not green</label>
             </section>
         </section>
@@ -39,8 +41,8 @@
                 <input type="checkbox" id="windowBadge"><label for="windowBadge">Show <samp>!</samp> badge on toolbar button when status is not green and the window could be opened.</label>
                 <br><small>This will replace the ppm value in the badge when it has 4 digits</small>
             </p>
-            <section class="browser-style">
-                <input type="checkbox" id="alwaysWindowBadge"><label for="alwaysWindowBadge">Always show badge when it's cold enough outside and too warm inside</label>
+            <section class="browser-style disabled">
+                <input type="checkbox" id="alwaysWindowBadge" disabled><label for="alwaysWindowBadge">Always show badge when it's cold enough outside and too warm inside</label>
             </section>
         </section>
         <section>
