@@ -8,7 +8,7 @@
     "lint:webext": "web-ext lint",
     "lint:ec": "eclint check $(git ls-files)",
     "lint:css": "stylelint *.css",
-    "test": "npm run lint:js && npm run lint:webext && npm run lint:ec",
+    "test": "npm run lint:js && npm run lint:webext && npm run lint:ec && npm run lint:css",
     "build": "web-ext build",
     "start": "web-ext run"
   },
