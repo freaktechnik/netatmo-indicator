@@ -120,13 +120,13 @@ class BooleanPref extends Pref {
         this.childSection = undefined;
         if(nextSection && nextSection.tagName.toLowerCase() === 'section' && !nextSection.classList.contains('no-indent')) {
             this.childSection = nextSection;
+            this.updateSubsections();
         }
-        this.updateSubsections();
     }
 
     updateSubsections() {
         if(this.childSection) {
-            const disabled = !this.input.checked;
+            const disabled = !this.getValue();
             this.childSection.classList.toggle('disabled', disabled);
             const inputs = this.childSection.querySelectorAll('input');
             if(inputs && inputs.length) {
@@ -138,13 +138,13 @@ class BooleanPref extends Pref {
     }
 
     storeValue(...args) {
-        this.updateSubsections();
         return super.storeValue(...args);
+        this.updateSubsections();
     }
 
     updateValue(val) {
-        this.updateSubsections();
         super.updateValue(!!val);
+        this.updateSubsections();
     }
 }
 
