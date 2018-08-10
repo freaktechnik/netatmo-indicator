@@ -121,6 +121,7 @@ class BooleanPref extends Pref {
         if(nextSection && nextSection.tagName.toLowerCase() === 'section' && !nextSection.classList.contains('no-indent')) {
             this.childSection = nextSection;
         }
+        this.updateSubsections();
     }
 
     updateSubsections() {
