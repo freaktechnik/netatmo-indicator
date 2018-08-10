@@ -138,8 +138,8 @@ class BooleanPref extends Pref {
     }
 
     storeValue(...args) {
-        return super.storeValue(...args);
         this.updateSubsections();
+        return super.storeValue(...args);
     }
 
     updateValue(val) {
