@@ -53,7 +53,7 @@ const HEX = 16,
         return formatted;
     },
     findOutdoorModules = (stations) => {
-        const modules = [].concat(...stations.map((s) => getOutdoorModules(s)));
+        const modules = stations.map((s) => getOutdoorModules(s)).flat();
         return modules.map((m) => formatDevice(m, 'outdoor'));
     },
     findDevice = (stations, device) => {
