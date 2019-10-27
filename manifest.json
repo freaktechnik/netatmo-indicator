@@ -2,7 +2,7 @@
     "manifest_version": 2,
     "name": "Netatmo CO₂ Indicator",
     "short_name": "CO₂ Indicator",
-    "version": "1.6.6",
+    "version": "1.6.7",
     "description": "See your CO₂ level in the browser toolbar",
     "permissions": [
         "identity",
