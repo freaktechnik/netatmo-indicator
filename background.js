@@ -423,7 +423,7 @@ const HEX = 16,
                 if(color) {
                     browser.theme.update({
                         colors: {
-                            accentcolor: color
+                            frame: color
                         }
                     });
                 }
