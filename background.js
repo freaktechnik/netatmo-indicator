@@ -93,7 +93,7 @@ const HEX = 16,
         API_BASE: 'https://api.netatmo.com/',
         SAFETY_OFFSET: 100,
         hasUpdateLoop: false,
-        redirectUri: 'https://netatmo.humanoids.be',
+        redirectUri: browser.identity.getRedirectURL(),
         async refreshToken() {
             try {
                 const { refreshToken } = await browser.storage.local.get('refreshToken'),
