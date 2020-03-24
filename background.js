@@ -102,18 +102,18 @@ const HEX = 16,
                 body.append('refresh_token', refreshToken);
                 body.append('client_id', clientToken);
                 body.append('client_secret', clientSecret);
-                const res = await fetch(`${this.API_BASE}oauth2/token`, {
+                const response = await fetch(`${this.API_BASE}oauth2/token`, {
                     method: 'POST',
                     body
                 });
-                if(res.ok) {
-                    const data = await res.json();
+                if(response.ok) {
+                    const data = await response.json();
                     return this.storeToken(data.access_token, data.expires_in * S_TO_MS, data.refresh_token);
                 }
                 throw new Error("Could not fetch new token");
             }
-            catch(e) {
-                console.error(e);
+            catch(error) {
+                console.error(error);
                 this.reset();
             }
         },
@@ -163,12 +163,12 @@ const HEX = 16,
             if(id) {
                 body.append('device_id', id);
             }
-            const res = await fetch(`${this.API_BASE}api/getstationsdata`, {
+            const response = await fetch(`${this.API_BASE}api/getstationsdata`, {
                 method: 'POST',
                 body
             });
-            if(res.ok) {
-                const data = await res.json(),
+            if(response.ok) {
+                const data = await response.json(),
                     { body: { devices } } = data;
                 if(Array.isArray(devices)) {
                     return devices;
@@ -222,12 +222,12 @@ const HEX = 16,
             }
             const body = new URLSearchParams();
             body.append('access_token', this.token);
-            const res = await fetch(`${this.API_BASE}api/gethomecoachsdata`, {
+            const response = await fetch(`${this.API_BASE}api/gethomecoachsdata`, {
                 method: 'POST',
                 body
             });
-            if(res.ok) {
-                const data = await res.json(),
+            if(response.ok) {
+                const data = await response.json(),
                     { body: devices } = data;
                 if(Array.isArray(devices)) {
                     return devices.map((d) => formatDevice(d, 'coach'));
@@ -243,12 +243,12 @@ const HEX = 16,
             const body = new URLSearchParams();
             body.append('access_token', this.token);
             body.append('device_id', this.device.id);
-            const res = await fetch(`${this.API_BASE}api/gethomecoachsdata`, {
+            const response = await fetch(`${this.API_BASE}api/gethomecoachsdata`, {
                 method: 'POST',
                 body
             });
-            if(res.ok) {
-                const data = await res.json(),
+            if(response.ok) {
+                const data = await response.json(),
                     { body: devices } = data;
                 if(Array.isArray(devices)) {
                     const d = findDevice(devices, this.device),
@@ -303,7 +303,7 @@ const HEX = 16,
             }
         },
         async setState(device, store = true, outdoorModule) {
-            const prevCO2 = this.device ? this.device.co2 : UNSET;
+            const previousCO2 = this.device ? this.device.co2 : UNSET;
             this.device = device;
             this.outdoorModule = outdoorModule;
             if(store) {
@@ -315,7 +315,7 @@ const HEX = 16,
             if(this.device) {
                 await Promise.all([
                     this.updateButton(),
-                    this.showNotification(prevCO2)
+                    this.showNotification(previousCO2)
                 ]);
             }
         },
@@ -432,7 +432,7 @@ const HEX = 16,
                 }
             }
         },
-        async showNotification(prevCO2) {
+        async showNotification(previousCO2) {
             const canShow = await browser.permissions.contains({
                 permissions: [ 'notifications' ]
             });
@@ -454,19 +454,19 @@ const HEX = 16,
                         type: 'basic'
                     };
                 let shouldLowerCO2 = false;
-                if(prevCO2 < prefs.boundaries.yellow && this.device.co2 >= prefs.boundaries.yellow && prefs.yellowNotification) {
+                if(previousCO2 < prefs.boundaries.yellow && this.device.co2 >= prefs.boundaries.yellow && prefs.yellowNotification) {
                     notifSpec.title = `CO₂ level above ${prefs.boundaries.yellow}ppm`;
                     shouldLowerCO2 = true;
                 }
-                else if(prevCO2 < prefs.boundaries.orange && this.device.co2 >= prefs.boundaries.orange && prefs.orangeNotification) {
+                else if(previousCO2 < prefs.boundaries.orange && this.device.co2 >= prefs.boundaries.orange && prefs.orangeNotification) {
                     notifSpec.title = `CO₂ level above ${prefs.boundaries.orange}ppm`;
                     shouldLowerCO2 = true;
                 }
-                else if(prevCO2 < prefs.boundaries.red && this.device.co2 >= prefs.boundaries.red && prefs.redNotification) {
+                else if(previousCO2 < prefs.boundaries.red && this.device.co2 >= prefs.boundaries.red && prefs.redNotification) {
                     notifSpec.title = `CO₂ level above ${prefs.boundaries.red}ppm`;
                     shouldLowerCO2 = true;
                 }
-                else if(prevCO2 >= prefs.boundaries.yellow && this.device.co2 < prefs.boundaries.yellow && prefs.greenNotification) {
+                else if(previousCO2 >= prefs.boundaries.yellow && this.device.co2 < prefs.boundaries.yellow && prefs.greenNotification) {
                     notifSpec.title = `CO₂ back to below ${prefs.boundaries.yellow}ppm`;
                 }
                 if(shouldLowerCO2 && this.outdoorModule && this.device.temp >= prefs.windowMin && this.device.temp - this.outdoorModule.temp >= prefs.windowDelta) {
@@ -494,12 +494,12 @@ const HEX = 16,
                 body.append('client_id', clientToken);
                 body.append('client_secret', clientSecret);
                 body.append('redirect_uri', this.redirectUri);
-                const res = await fetch(`${this.API_BASE}oauth2/token`, {
+                const response = await fetch(`${this.API_BASE}oauth2/token`, {
                     method: 'POST',
                     body
                 });
-                if(res.ok) {
-                    const data = await res.json();
+                if(response.ok) {
+                    const data = await response.json();
                     await this.storeToken(data.access_token, data.expires_in * S_TO_MS, data.refresh_token);
                 }
             }
@@ -571,8 +571,8 @@ const HEX = 16,
                                 });
                             }
                         }
-                        catch(e) {
-                            console.error(e);
+                        catch(error) {
+                            console.error(error);
                         }
                     }
                     if(changes.hasOwnProperty('token') && !changes.token.newValue) {
@@ -598,7 +598,7 @@ const HEX = 16,
                 try {
                     await this.login();
                 }
-                catch(e) {
+                catch(error) {
                     console.warn("OAuth aborted");
                 }
             }

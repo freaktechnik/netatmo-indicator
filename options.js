@@ -34,15 +34,15 @@ const BOOLEAN_PREFS = [
     },
 
     showError = (error) => {
-        let msg;
+        let message;
         if(error instanceof Error) {
-            msg = error.message;
+            message = error.message;
         }
         else {
-            msg = error;
+            message = error;
         }
         const errorPanel = document.getElementById("error");
-        errorPanel.textContent = msg;
+        errorPanel.textContent = message;
         errorPanel.hidden = false;
     },
 
@@ -82,9 +82,9 @@ class Pref {
         }
     }
 
-    updateValue(val) {
-        if(val !== undefined) {
-            this.input[this.property] = val;
+    updateValue(value) {
+        if(value !== undefined) {
+            this.input[this.property] = value;
         }
     }
 }
@@ -137,13 +137,13 @@ class BooleanPref extends Pref {
         }
     }
 
-    storeValue(...args) {
+    storeValue(...arguments_) {
         this.updateSubsections();
-        return super.storeValue(...args);
+        return super.storeValue(...arguments_);
     }
 
-    updateValue(val) {
-        super.updateValue(!!val);
+    updateValue(value) {
+        super.updateValue(!!value);
         this.updateSubsections();
     }
 }
@@ -153,9 +153,9 @@ class NumberPref extends Pref {
         super(id, 'input', 'valueAsNumber');
     }
 
-    updateValue(val) {
-        if(val !== undefined) {
-            this.input.value = val;
+    updateValue(value) {
+        if(value !== undefined) {
+            this.input.value = value;
         }
     }
 }
@@ -177,16 +177,16 @@ class BoundaryPref {
 
     storeValue() {
         const boundaries = {};
-        let prevValue = Infinity;
+        let previousValue = Infinity;
         for(const boundary of this.boundaries) {
             const value = boundary.getValue();
-            boundary.input.max = prevValue;
-            if(value > prevValue) {
+            boundary.input.max = previousValue;
+            if(value > previousValue) {
                 boundary.input.setCustomValidity("Must be smaller than the value of the previous color");
             }
             else {
                 boundary.input.setCustomValidity("");
-                prevValue = value;
+                previousValue = value;
             }
             boundaries[boundary.id] = value;
         }
@@ -195,10 +195,10 @@ class BoundaryPref {
         }).catch(showError);
     }
 
-    updateValue(val) {
+    updateValue(value) {
         for(const boundary of this.boundaries) {
-            if(val && val.hasOwnProperty(boundary.id)) {
-                boundary.updateValue(val[boundary.id]);
+            if(value && value.hasOwnProperty(boundary.id)) {
+                boundary.updateValue(value[boundary.id]);
             }
         }
     }
@@ -219,9 +219,9 @@ class StationsList extends Pref {
     }
 
     getValue() {
-        const val = super.getValue();
-        if(val) {
-            return JSON.parse(val);
+        const value = super.getValue();
+        if(value) {
+            return JSON.parse(value);
         }
     }
 
@@ -248,16 +248,16 @@ class StationsList extends Pref {
         this.input.disabled = true;
     }
 
-    updateValue(val) {
-        this.fill(val).catch(showError);
+    updateValue(value) {
+        this.fill(value).catch(showError);
     }
 }
 
 class OutdoorList extends StationsList {
     constructor(id) {
         super(id, 'outdoorModules');
-        devices.then((dev) => {
-            document.getElementById("hasDelta").hidden = !dev.outdoorModules.length;
+        devices.then((development) => {
+            document.getElementById("hasDelta").hidden = !development.outdoorModules.length;
         })
             .catch(showError);
     }
