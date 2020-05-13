@@ -20,7 +20,7 @@ const HEX = 16,
         normalized._id = station._id;
         return normalized;
     },
-    isSameDevice = (a, b) => a.id === b.id && a.module_id === b.module_id,
+    isSameDevice = (a, b) => a && b && a.id === b.id && a.module_id === b.module_id,
     getOutdoorModules = (device) => {
         if(device.hasOwnProperty('modules')) {
             return device.modules.filter((m) => m.type === "NAModule1").map((m) => normalizeModule(m, device));
@@ -30,11 +30,16 @@ const HEX = 16,
     formatDevice = (device, type) => {
         const formatted = {
             type,
-            id: device._id,
-            temp: device.dashboard_data.Temperature
+            id: device._id
         };
-        if(device.dashboard_data.hasOwnProperty('CO2') && type !== 'outdoor') {
-            formatted.co2 = device.dashboard_data.CO2;
+        if(device.dashboard_data) {
+            formatted.temp = device.dashboard_data.Temperature;
+            if(device.dashboard_data.hasOwnProperty('CO2') && type !== 'outdoor') {
+                formatted.co2 = device.dashboard_data.CO2;
+            }
+        }
+        else {
+            formatted.temp = NaN;
         }
         if(device.hasOwnProperty('module_id')) {
             formatted.module_id = device.module_id;
@@ -183,7 +188,7 @@ const HEX = 16,
             for(const d of devices) {
                 if(d.modules.length) {
                     for(const module of d.modules) {
-                        if(module.dashboard_data.hasOwnProperty('CO2')) {
+                        if(module.dashboard_data && module.dashboard_data.hasOwnProperty('CO2')) {
                             allDevices.push(formatDevice(normalizeModule(module, d), 'weather'));
                         }
                     }
