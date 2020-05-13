@@ -1,6 +1,6 @@
 {
   "name": "netatmo-indicator",
-  "version": "1.6.8",
+  "version": "1.6.9",
   "description": "See your CO₂ level in the browser toolbar",
   "main": "background.js",
   "scripts": {
