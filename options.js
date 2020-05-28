@@ -46,9 +46,9 @@ const BOOLEAN_PREFS = [
         const errorPanel = document.getElementById("error");
         errorPanel.textContent = message;
         errorPanel.hidden = false;
-    },
+    };
 
-    devices = browser.runtime.sendMessage('getstations');
+let devices = browser.runtime.sendMessage('getstations');
 
 class Pref {
     constructor(id, eventType = 'input', property = 'value') {
@@ -309,6 +309,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 showError(error);
             }
             login.textContent = 'Logout';
+            document.getElementById("error").hidden = true;
+            devices = browser.runtime.sendMessage('getstations');
             const {
                 device, outdoorModule
             } = await browser.storage.local.get([
