@@ -12,6 +12,7 @@ const HEX = 16,
     FIRST = 0,
     UNSET = -1,
     FOUR_DIGITS = 1000,
+    NOT_AUTHORIZED = 403,
     /* eslint-disable camelcase */
     normalizeModule = (module, station) => {
         const normalized = Object.assign({}, module);
@@ -123,7 +124,8 @@ const HEX = 16,
             }
         },
         async storeToken(token, expiresIn, refreshToken) {
-            const date = Date.now() + expiresIn;
+            const secondTimestampInMS = Math.floor(Date.now() / S_TO_MS) * S_TO_MS,
+                date = secondTimestampInMS + expiresIn;
             await browser.storage.local.set({
                 token,
                 refreshToken,
@@ -179,6 +181,10 @@ const HEX = 16,
                     return devices;
                 }
                 return [];
+            }
+            if(response.status === NOT_AUTHORIZED) {
+                await this.refreshToken();
+                return this.fetchStationData(id);
             }
             throw new Error("Failed to update station data");
         },
@@ -239,6 +245,10 @@ const HEX = 16,
                 }
                 return [];
             }
+            if(response.status === NOT_AUTHORIZED) {
+                await this.refreshToken();
+                return this.getHomeCoachesData();
+            }
             throw new Error("failed to fetch health coach data");
         },
         async getHomeCoachData() {
@@ -266,6 +276,10 @@ const HEX = 16,
                     }
                     return this.setState(newDevice, true, outdoorModule);
                 }
+            }
+            if(response.status === NOT_AUTHORIZED) {
+                await this.refreshToken();
+                return this.getHomeCoachData();
             }
             throw new Error("failed to update health coach data");
         },

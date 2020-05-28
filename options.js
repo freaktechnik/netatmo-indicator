@@ -5,6 +5,8 @@
  * obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+//TODO try to remember previous station when relogging
+
 const BOOLEAN_PREFS = [
         'updateTheme',
         'ppmOnBadge',
@@ -275,16 +277,17 @@ document.addEventListener('DOMContentLoaded', () => {
     prefs.boundaries = new BoundaryPref();
     prefs.device = new StationsList('device', 'stations');
     prefs.outdoorModule = new OutdoorList('outdoorModule');
-    browser.storage.local.get(Object.keys(prefs).concat([ 'token' ])).then((vals) => {
-        for(const p in prefs) {
-            if(prefs.hasOwnProperty(p) && vals.hasOwnProperty(p) && (vals.token || (p !== 'device' && p !== 'outdoorModule'))) {
-                prefs[p].updateValue(vals[p]);
+    browser.storage.local.get(Object.keys(prefs).concat([ 'token' ]))
+        .then((vals) => {
+            for(const p in prefs) {
+                if(prefs.hasOwnProperty(p) && vals.hasOwnProperty(p) && (vals.token || (p !== 'device' && p !== 'outdoorModule'))) {
+                    prefs[p].updateValue(vals[p]);
+                }
             }
-        }
-        if(vals.token) {
-            login.textContent = 'Logout';
-        }
-    })
+            if(vals.token) {
+                login.textContent = 'Logout';
+            }
+        })
         .catch(showError);
 
     login.addEventListener("click", async () => {
@@ -296,9 +299,15 @@ document.addEventListener('DOMContentLoaded', () => {
             login.textContent = 'Login';
             prefs.device.clear();
             prefs.outdoorModule.clear();
+            document.getElementById("error").hidden = true;
         }
         else {
-            await browser.runtime.sendMessage('login').catch(showError);
+            try {
+                await browser.runtime.sendMessage('login');
+            }
+            catch(error) {
+                showError(error);
+            }
             login.textContent = 'Logout';
             const {
                 device, outdoorModule
