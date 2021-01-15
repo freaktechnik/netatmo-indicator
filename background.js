@@ -58,6 +58,16 @@ const HEX = 16,
         }
         return formatted;
     },
+    stripDevice = (device) => ({
+        type: device.type,
+        id: device.id,
+        module_id: device.module_id,
+        group: device.group,
+        name: device.name,
+        module: device.module,
+        co2: UNSET,
+        temp: NaN
+    }),
     findOutdoorModules = (stations) => {
         const modules = stations.map((s) => getOutdoorModules(s)).flat();
         return modules.map((m) => formatDevice(m, 'outdoor'));
@@ -408,7 +418,7 @@ const HEX = 16,
                 path: this.getImage(boundaries)
             });
             await browser.browserAction.setTitle({
-                title: this.device ? `${this.device.name}: ${this.device.co2}ppm` : 'Netatmo CO₂ Measurement'
+                title: this.device && this.device.co2 !== UNSET ? `${this.device.name}: ${this.device.co2}ppm` : 'Netatmo CO₂ Measurement'
             });
             let badgeText = '';
             if(windowBadge && this.outdoorModule && (this.device.co2 >= boundaries.yellow || alwaysWindowBadge) && this.device.temp >= windowMin && this.device.temp - this.outdoorModule.temp >= windowDelta) {
@@ -530,7 +540,7 @@ const HEX = 16,
             const p = browser.alarms.clearAll();
             this.hasUpdateLoop = false;
             this.token = undefined;
-            const p2 = this.setState(undefined, true, undefined);
+            const p2 = this.setState(stripDevice(this.device), true, stripDevice(this.outdoorModule));
             return Promise.all([
                 p,
                 p2
