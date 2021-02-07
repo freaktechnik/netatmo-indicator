@@ -8,7 +8,8 @@ the exact measurement. Clicking on the dot brings you to your Netatmo weather da
 
 ## Official Download
 
-[![addons.mozilla.org/](https://addons.cdn.mozilla.net/static/img/addons-buttons/AMO-button_2.png)](https://addons.mozilla.org/firefox/addon/netatmo-co-indicator/?src=external-gh-readme)
+[![addons.mozilla.org/](https://addons.cdn.mozilla.net/static/img/addons-buttons/AMO-button_2.png)](https://addons.mozilla.org/firefox/addon/netatmo-co-indicator/?utm_source=github.com&utm_content=install)
 
 ## License
+
 [MPL 2.0](/LICENSE)
