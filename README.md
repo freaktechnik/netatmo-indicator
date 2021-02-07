@@ -1,7 +1,5 @@
 # ![](icon.svg) Netatmo CO₂ Indicator
 
-[![Build Status](https://travis-ci.org/freaktechnik/netatmo-indicator.svg?branch=master)](https://travis-ci.org/freaktechnik/netatmo-indicator)
-
 Immediately see the current CO₂ level your Netatmo weather station is reporting,
 just by looking at your browser toolbar.
 

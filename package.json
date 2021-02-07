@@ -27,10 +27,10 @@
   },
   "homepage": "https://github.com/freaktechnik/netatmo-indicator#readme",
   "devDependencies": {
-    "@freaktechnik/eslint-config-extension": "^7.2.0",
+    "@freaktechnik/eslint-config-extension": "^8.0.2",
     "eclint": "^2.8.1",
-    "eslint": "^7.17.0",
-    "stylelint": "^13.8.0",
+    "eslint": "^7.19.0",
+    "stylelint": "^13.9.0",
     "stylelint-config-standard": "^20.0.0",
     "stylelint-no-unsupported-browser-features": "^4.1.4",
     "web-ext": "^5.5.0"
@@ -49,6 +49,14 @@
   "private": true,
   "browserslist": [
     "last 1 Firefox versions",
-    "last 1 FirefoxAndroid versions"
-  ]
+    "last 1 FirefoxAndroid versions",
+    "Firefox ESR"
+  ],
+  "webExt": {
+    "ignoreFiles": [
+      "package.json",
+      "package-lock.json",
+      "README.md"
+    ]
+  }
 }
