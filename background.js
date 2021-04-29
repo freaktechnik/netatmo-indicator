@@ -117,8 +117,13 @@ const HEX = 16,
         SAFETY_OFFSET: 100,
         hasUpdateLoop: false,
         redirectUri: browser.identity.getRedirectURL(),
+        waitingForOnline: false,
         async refreshToken() {
             if(!navigator.onLine) {
+                if(this.waitingForOnline) {
+                    return;
+                }
+                this.waitingForOnline = true;
                 await waitForOnline();
             }
             try {
@@ -134,12 +139,18 @@ const HEX = 16,
                 });
                 if(response.ok) {
                     const data = await response.json();
+                    this.waitingForOnline = false;
                     return this.storeToken(data.access_token, data.expires_in * S_TO_MS, data.refresh_token);
                 }
                 if(response.status === OFFLINE) {
-                    await waitForOnline();
-                    return this.refreshToken();
+                    if(!this.waitingForOnline) {
+                        this.waitingForOnline = true;
+                        await waitForOnline();
+                        return this.refreshToken();
+                    }
+                    return;
                 }
+                this.waitingForOnline = false;
                 throw new Error("Could not fetch new token");
             }
             catch(error) {
