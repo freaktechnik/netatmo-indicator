@@ -13,6 +13,7 @@ const HEX = 16,
     UNSET = -1,
     FOUR_DIGITS = 1000,
     NOT_AUTHORIZED = 403,
+    OFFLINE = 0,
     /* eslint-disable camelcase */
     normalizeModule = (module, station) => {
         const normalized = Object.assign({}, module);
@@ -87,6 +88,12 @@ const HEX = 16,
         }
         return {};
     },
+    waitForOnline = () => new Promise((resolve) => {
+        window.addEventListener("online", resolve, {
+            once: true,
+            passive: true
+        });
+    }),
     /* eslint-enable camelcase */
     netatmo = {
         BUTTON_PREFS: [
@@ -111,6 +118,9 @@ const HEX = 16,
         hasUpdateLoop: false,
         redirectUri: browser.identity.getRedirectURL(),
         async refreshToken() {
+            if(!navigator.onLine) {
+                await waitForOnline();
+            }
             try {
                 const { refreshToken } = await browser.storage.local.get('refreshToken'),
                     body = new URLSearchParams();
@@ -125,6 +135,10 @@ const HEX = 16,
                 if(response.ok) {
                     const data = await response.json();
                     return this.storeToken(data.access_token, data.expires_in * S_TO_MS, data.refresh_token);
+                }
+                if(response.status === OFFLINE) {
+                    await waitForOnline();
+                    return this.refreshToken();
                 }
                 throw new Error("Could not fetch new token");
             }
@@ -565,7 +579,7 @@ const HEX = 16,
                 if(alarm.name === this.REFRESH_ALARM) {
                     this.refreshToken().catch(console.error);
                 }
-                else if(alarm.name == this.UPDATE_ALARM) {
+                else if(alarm.name == this.UPDATE_ALARM && navigator.onLine) {
                     this.updateData().catch(console.error);
                 }
             });
@@ -623,6 +637,10 @@ const HEX = 16,
                 'token',
                 'expires'
             ]);
+            //TODO also wait for captive protal?!
+            if(!navigator.onLine) {
+                await waitForOnline();
+            }
             if(!token) {
                 try {
                     await this.login();
