@@ -8,12 +8,15 @@
 
 const HEX = 16,
     TEN = 10,
+    MINUTE = 60,
     S_TO_MS = 1000,
     FIRST = 0,
     UNSET = -1,
     FOUR_DIGITS = 1000,
     NOT_AUTHORIZED = 403,
     OFFLINE = 0,
+    MAX_NETWORK_ERRORS = 10,
+    BACKOFF_BASE_MINS = 2,
     /* eslint-disable camelcase */
     normalizeModule = (module, station) => {
         const normalized = Object.assign({}, module);
@@ -60,12 +63,12 @@ const HEX = 16,
         return formatted;
     },
     stripDevice = (device) => ({
-        type: device.type,
-        id: device.id,
-        module_id: device.module_id,
-        group: device.group,
-        name: device.name,
-        module: device.module,
+        type: device?.type,
+        id: device?.id,
+        module_id: device?.module_id,
+        group: device?.group,
+        name: device?.name,
+        module: device?.module,
         co2: UNSET,
         temp: NaN
     }),
@@ -118,6 +121,7 @@ const HEX = 16,
         hasUpdateLoop: false,
         redirectUri: browser.identity.getRedirectURL(),
         waitingForOnline: false,
+        networkErrorTries: 0,
         async refreshToken() {
             if(!navigator.onLine) {
                 if(this.waitingForOnline) {
@@ -137,6 +141,7 @@ const HEX = 16,
                     method: 'POST',
                     body
                 });
+                this.networkErrorTries = 0;
                 if(response.ok) {
                     const data = await response.json();
                     this.waitingForOnline = false;
@@ -154,6 +159,12 @@ const HEX = 16,
                 throw new Error("Could not fetch new token");
             }
             catch(error) {
+                if (error instanceof TypeError && error.name === "NetworkError" && this.networkErrorTries < MAX_NETWORK_ERRORS) {
+                    const waitFor = (BACKOFF_BASE_MINS ** this.networkErrorTries) * MINUTE * S_TO_MS;
+                    ++this.networkErrorTries;
+                    await new Promise((resolve) => setTimeout(resolve, waitFor));
+                    return this.refreshToken();
+                }
                 console.error(error);
                 this.reset();
             }
@@ -334,17 +345,17 @@ const HEX = 16,
                 'outdoorModule'
             ]);
             if(device) {
-                const updatedDevice = stations.stations.find((d) => isSameDevice(d, device)) || device;
+                const updatedDevice = stations?.stations.find((d) => isSameDevice(d, device)) || device;
                 let updatedOutdoor;
                 if(outdoorModule) {
-                    updatedOutdoor = stations.outdoorModules.find((m) => isSameDevice(m, outdoorModule)) || outdoorModule;
+                    updatedOutdoor = stations?.outdoorModules.find((m) => isSameDevice(m, outdoorModule)) || outdoorModule;
                 }
-                else if(stations.outdoorModules.length) {
+                else if(stations?.outdoorModules.length) {
                     updatedOutdoor = stations.outdoorModules[FIRST];
                 }
                 await this.setState(updatedDevice, !outdoorModule, updatedOutdoor);
             }
-            else if(stations && stations.stations.length) {
+            else if(stations?.stations.length) {
                 let outdoor = outdoorModule;
                 if(stations.outdoorModules.length && !outdoor) {
                     outdoor = stations.outdoorModules[FIRST];
@@ -667,6 +678,7 @@ const HEX = 16,
                     await this.ensureUpdateLoop();
                 }
                 else {
+                    await this.restoreState();
                     await this.refreshToken();
                 }
             }
