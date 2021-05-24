@@ -159,7 +159,7 @@ const HEX = 16,
                 throw new Error("Could not fetch new token");
             }
             catch(error) {
-                if (error instanceof TypeError && error.name === "NetworkError" && this.networkErrorTries < MAX_NETWORK_ERRORS) {
+                if(error instanceof TypeError && error.name === "NetworkError" && this.networkErrorTries < MAX_NETWORK_ERRORS) {
                     const waitFor = (BACKOFF_BASE_MINS ** this.networkErrorTries) * MINUTE * S_TO_MS;
                     ++this.networkErrorTries;
                     await new Promise((resolve) => setTimeout(resolve, waitFor));
