@@ -238,7 +238,7 @@ const HEX = 16,
             const devices = await this.fetchStationData(),
                 allDevices = [];
             for(const d of devices) {
-                if(d.modules.length) {
+                if(d.modules?.length) {
                     for(const module of d.modules) {
                         if(module.dashboard_data && module.dashboard_data.hasOwnProperty('CO2')) {
                             allDevices.push(formatDevice(normalizeModule(module, d), 'weather'));
