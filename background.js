@@ -116,6 +116,7 @@ const HEX = 16,
         DEFAULT_WINDOW_DELTA: 24,
         REFRESH_ALARM: 'refresh',
         UPDATE_ALARM: 'update',
+        REFREASH_BACKOFF_ALARM: 'refresh-backoff',
         API_BASE: 'https://api.netatmo.com/',
         SAFETY_OFFSET: 100,
         hasUpdateLoop: false,
@@ -125,7 +126,7 @@ const HEX = 16,
         async refreshToken() {
             if(!navigator.onLine) {
                 if(this.waitingForOnline) {
-                    return;
+                    return false;
                 }
                 this.waitingForOnline = true;
                 await waitForOnline();
@@ -145,7 +146,8 @@ const HEX = 16,
                 if(response.ok) {
                     const data = await response.json();
                     this.waitingForOnline = false;
-                    return this.storeToken(data.access_token, data.expires_in * S_TO_MS, data.refresh_token);
+                    await this.storeToken(data.access_token, data.expires_in * S_TO_MS, data.refresh_token);
+                    return true;
                 }
                 if(response.status === OFFLINE) {
                     if(!this.waitingForOnline) {
@@ -153,21 +155,24 @@ const HEX = 16,
                         await waitForOnline();
                         return this.refreshToken();
                     }
-                    return;
+                    return false;
                 }
                 this.waitingForOnline = false;
                 throw new Error("Could not fetch new token");
             }
             catch(error) {
                 if(error instanceof TypeError && error.name === "NetworkError" && this.networkErrorTries < MAX_NETWORK_ERRORS) {
-                    const waitFor = (BACKOFF_BASE_MINS ** this.networkErrorTries) * MINUTE * S_TO_MS;
+                    const waitFor = (BACKOFF_BASE_MINS ** this.networkErrorTries) * MINUTE;
                     ++this.networkErrorTries;
-                    await new Promise((resolve) => setTimeout(resolve, waitFor));
-                    return this.refreshToken();
+                    browser.alarms.create(this.REFREASH_BACKOFF_ALARM, {
+                        delayInMinutes: waitFor
+                    });
+                    return false;
                 }
                 console.error(error);
                 this.reset();
             }
+            return false;
         },
         async storeToken(token, expiresIn, refreshToken) {
             const secondTimestampInMS = Math.floor(Date.now() / S_TO_MS) * S_TO_MS,
@@ -228,8 +233,7 @@ const HEX = 16,
                 }
                 return [];
             }
-            if(response.status === NOT_AUTHORIZED) {
-                await this.refreshToken();
+            if(response.status === NOT_AUTHORIZED && await this.refreshToken()) {
                 return this.fetchStationData(id);
             }
             throw new Error("Failed to update station data");
@@ -291,8 +295,7 @@ const HEX = 16,
                 }
                 return [];
             }
-            if(response.status === NOT_AUTHORIZED) {
-                await this.refreshToken();
+            if(response.status === NOT_AUTHORIZED && await this.refreshToken()) {
                 return this.getHomeCoachesData();
             }
             throw new Error("failed to fetch health coach data");
@@ -323,8 +326,7 @@ const HEX = 16,
                     return this.setState(newDevice, true, outdoorModule);
                 }
             }
-            if(response.status === NOT_AUTHORIZED) {
-                await this.refreshToken();
+            if(response.status === NOT_AUTHORIZED && await this.refreshToken()) {
                 return this.getHomeCoachData();
             }
             throw new Error("failed to update health coach data");
@@ -603,6 +605,9 @@ const HEX = 16,
                 }
                 else if(alarm.name == this.UPDATE_ALARM && navigator.onLine) {
                     this.updateData().catch(console.error);
+                }
+                else if(alarm.name === this.REFREASH_BACKOFF_ALARM) {
+                    this.refreshToken().catch(console.error);
                 }
             });
             browser.browserAction.onClicked.addListener(() => {
