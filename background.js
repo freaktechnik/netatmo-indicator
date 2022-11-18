@@ -8,7 +8,6 @@
 
 const HEX = 16,
     TEN = 10,
-    MINUTE = 60,
     S_TO_MS = 1000,
     FIRST = 0,
     UNSET = -1,
@@ -17,6 +16,7 @@ const HEX = 16,
     OFFLINE = 0,
     MAX_NETWORK_ERRORS = 10,
     BACKOFF_BASE_MINS = 2,
+    ONE_TRY = 1,
     /* eslint-disable camelcase */
     normalizeModule = (module, station) => {
         const normalized = Object.assign({}, module);
@@ -119,10 +119,25 @@ const HEX = 16,
         REFREASH_BACKOFF_ALARM: 'refresh-backoff',
         API_BASE: 'https://api.netatmo.com/',
         SAFETY_OFFSET: 100,
-        hasUpdateLoop: false,
+        get hasUpdateLoop() {
+            return sessionStorage.getItem('hasUpdateLoop') === "true" ?? false;
+        },
+        set hasUpdateLoop(value) {
+            sessionStorage.setItem('hasUpdateLoop', value);
+        },
         redirectUri: browser.identity.getRedirectURL(),
-        waitingForOnline: false,
-        networkErrorTries: 0,
+        get waitingForOnline() {
+            return sessionStorage.getItem('waitingForOnline') === "true" ?? false;
+        },
+        set waitingForOnline(value) {
+            sessionStorage.setItem('waitingForOnline', value);
+        },
+        get networkErrorTries() {
+            return Number.parseInt(sessionStorage.getItem('networkErrorTries') ?? '0', 10);
+        },
+        set networkErrorTries(value) {
+            sessionStorage.setItem('networkErrorTries', value);
+        },
         async refreshToken() {
             if(!navigator.onLine) {
                 if(this.waitingForOnline) {
@@ -162,8 +177,8 @@ const HEX = 16,
             }
             catch(error) {
                 if(error instanceof TypeError && error.name === "NetworkError" && this.networkErrorTries < MAX_NETWORK_ERRORS) {
-                    const waitFor = (BACKOFF_BASE_MINS ** this.networkErrorTries) * MINUTE;
-                    ++this.networkErrorTries;
+                    const waitFor = (BACKOFF_BASE_MINS ** this.networkErrorTries);
+                    this.networkErrorTries = this.networkErrorTries + ONE_TRY;
                     browser.alarms.create(this.REFREASH_BACKOFF_ALARM, {
                         delayInMinutes: waitFor
                     });
@@ -182,7 +197,6 @@ const HEX = 16,
                 refreshToken,
                 expires: date
             });
-            this.token = token;
             this.scheduleRefresh(date);
             await this.ensureUpdateLoop();
         },
@@ -213,11 +227,12 @@ const HEX = 16,
             }
         },
         async fetchStationData(id) {
-            if(!this.token) {
+            const { token } = await browser.storage.local.get('token');
+            if(!token) {
                 throw new Error("Not authorized");
             }
             const body = new URLSearchParams();
-            body.append('access_token', this.token);
+            body.append('access_token', token);
             if(id) {
                 body.append('device_id', id);
             }
@@ -278,11 +293,12 @@ const HEX = 16,
             return this.setState(newDevice, true, outdoorModule);
         },
         async getHomeCoachesData() {
-            if(!this.token) {
+            const { token } = browser.storage.local.get('token');
+            if(!token) {
                 throw new Error("Not authorized");
             }
             const body = new URLSearchParams();
-            body.append('access_token', this.token);
+            body.append('access_token', token);
             const response = await fetch(`${this.API_BASE}api/gethomecoachsdata`, {
                 method: 'POST',
                 body
@@ -301,11 +317,12 @@ const HEX = 16,
             throw new Error("failed to fetch health coach data");
         },
         async getHomeCoachData() {
-            if(!this.token) {
+            const { token } = browser.storage.local.get('token');
+            if(!token) {
                 throw new Error("Not authorized");
             }
             const body = new URLSearchParams();
-            body.append('access_token', this.token);
+            body.append('access_token', token);
             body.append('device_id', this.device.id);
             const response = await fetch(`${this.API_BASE}api/gethomecoachsdata`, {
                 method: 'POST',
@@ -577,9 +594,9 @@ const HEX = 16,
         reset() {
             const p = browser.alarms.clearAll();
             this.hasUpdateLoop = false;
-            this.token = undefined;
             const p2 = this.setState(stripDevice(this.device), true, stripDevice(this.outdoorModule));
             return Promise.all([
+                browser.storage.local.set({ token: '' }),
                 p,
                 p2
             ]);
@@ -599,65 +616,7 @@ const HEX = 16,
             };
         },
         async init() {
-            browser.alarms.onAlarm.addListener((alarm) => {
-                if(alarm.name === this.REFRESH_ALARM) {
-                    this.refreshToken().catch(console.error);
-                }
-                else if(alarm.name == this.UPDATE_ALARM && navigator.onLine) {
-                    this.updateData().catch(console.error);
-                }
-                else if(alarm.name === this.REFREASH_BACKOFF_ALARM) {
-                    this.refreshToken().catch(console.error);
-                }
-            });
-            browser.browserAction.onClicked.addListener(() => {
-                browser.tabs.create({
-                    url: 'https://my.netatmo.com'
-                });
-            });
-            browser.storage.onChanged.addListener(async (changes, area) => {
-                if(area === 'local') {
-                    if(changes.hasOwnProperty('updateTheme') && changes.updateTheme.oldValue && !changes.updateTheme.newValue) {
-                        browser.theme.reset();
-                    }
-                    if(changes.hasOwnProperty('device') && !isSameDevice(changes.device.newValue, changes.device.oldValue)) {
-                        // Need to await so outdoor module doesn't clash with this.
-                        await this.setState(changes.device.newValue, false, this.outdoorModule).catch(console.error);
-                        this.ensureUpdateLoop();
-                    }
-                    if(changes.hasOwnProperty('outdoorModule') && !isSameDevice(changes.outdoorModule.newValue, changes.outdoorModule.oldValue)) {
-                        await this.setState(this.device, false, changes.outdoorModule.newValue).catch(console.error);
-                    }
-                    // Don't have to udpate the button if the state has changed.
-                    else if(this.device && (this.BUTTON_PREFS.some((p) => changes.hasOwnProperty(p)) || (changes.hasOwnProperty('updateTheme') && changes.updateTheme.newValue))) {
-                        this.updateButton().catch(console.error);
-                    }
-                    if(changes.hasOwnProperty('interval') && this.hasUpdateLoop) {
-                        try {
-                            await browser.alarms.clear(this.UPDATE_ALARM);
-                            if(changes.interval.newValue) {
-                                browser.alarms.create(this.UPDATE_ALARM, {
-                                    periodInMinutes: changes.interval.newValue
-                                });
-                            }
-                        }
-                        catch(error) {
-                            console.error(error);
-                        }
-                    }
-                    if(changes.hasOwnProperty('token') && !changes.token.newValue) {
-                        this.reset().catch(console.error);
-                    }
-                }
-            });
-            browser.runtime.onMessage.addListener((message) => {
-                if(message === 'login') {
-                    return this.login();
-                }
-                else if(message === 'getstations') {
-                    return this.getStationsList();
-                }
-            });
+            this.hasUpdateLoop = false;
             const {
                 token, expires
             } = await browser.storage.local.get([
@@ -676,35 +635,90 @@ const HEX = 16,
                     console.warn("OAuth aborted");
                 }
             }
-            else {
-                this.token = token;
-                if(expires > Date.now()) {
-                    this.scheduleRefresh(expires);
-                    await this.ensureUpdateLoop();
-                }
-                else {
-                    await this.restoreState();
-                    await this.refreshToken();
-                }
-            }
-            const hasNotifs = await browser.permissions.contains({
-                    permissions: [ 'notifications' ]
-                }),
-                addListener = () => browser.notifications.onShown.addListener(() => {
-                    browser.runtime.sendMessage("@notification-sound", "new-notification").catch(console.warn);
-                });
-            if(hasNotifs) {
-                addListener();
+            else if(expires > Date.now()) {
+                this.scheduleRefresh(expires);
+                await this.ensureUpdateLoop();
             }
             else {
-                const listener = (change) => {
-                    if(change.permissions && change.permissions.includes('notifications')) {
-                        addListener();
-                        browser.permissions.onAdded.removeListener(listener);
-                    }
-                };
-                browser.permissions.onAdded.addListener(listener);
+                await this.restoreState();
+                await this.refreshToken();
             }
         }
+    },
+    notificationListener = () => {
+        browser.runtime.sendMessage("@notification-sound", "new-notification").catch(console.warn);
     };
-netatmo.init().catch(console.error);
+browser.runtime.onStartup.addListener(() => {
+    netatmo.init().catch(console.error);
+});
+browser.runtime.onInstalled.addListener((details) => {
+    if(details.reasion !== "browser_update") {
+        netatmo.init().catch(console.error);
+    }
+});
+
+browser.alarms.onAlarm.addListener((alarm) => {
+    if(alarm.name === netatmo.REFRESH_ALARM) {
+        netatmo.refreshToken().catch(console.error);
+    }
+    else if(alarm.name == netatmo.UPDATE_ALARM && navigator.onLine) {
+        netatmo.updateData().catch(console.error);
+    }
+    else if(alarm.name === netatmo.REFREASH_BACKOFF_ALARM) {
+        netatmo.refreshToken().catch(console.error);
+    }
+});
+browser.browserAction.onClicked.addListener(() => {
+    browser.tabs.create({
+        url: 'https://my.netatmo.com'
+    });
+});
+browser.storage.onChanged.addListener(async (changes, area) => {
+    if(area === 'local') {
+        if(changes.hasOwnProperty('updateTheme') && changes.updateTheme.oldValue && !changes.updateTheme.newValue) {
+            browser.theme.reset();
+        }
+        if(changes.hasOwnProperty('device') && !isSameDevice(changes.device.newValue, changes.device.oldValue)) {
+            // Need to await so outdoor module doesn't clash with this.
+            await netatmo.setState(changes.device.newValue, false, netatmo.outdoorModule).catch(console.error);
+            netatmo.ensureUpdateLoop();
+        }
+        if(changes.hasOwnProperty('outdoorModule') && !isSameDevice(changes.outdoorModule.newValue, changes.outdoorModule.oldValue)) {
+            await netatmo.setState(netatmo.device, false, changes.outdoorModule.newValue).catch(console.error);
+        }
+        // Don't have to udpate the button if the state has changed.
+        else if(netatmo.device && (netatmo.BUTTON_PREFS.some((p) => changes.hasOwnProperty(p)) || (changes.hasOwnProperty('updateTheme') && changes.updateTheme.newValue))) {
+            netatmo.updateButton().catch(console.error);
+        }
+        if(changes.hasOwnProperty('interval') && netatmo.hasUpdateLoop) {
+            try {
+                await browser.alarms.clear(netatmo.UPDATE_ALARM);
+                if(changes.interval.newValue) {
+                    browser.alarms.create(netatmo.UPDATE_ALARM, {
+                        periodInMinutes: changes.interval.newValue
+                    });
+                }
+            }
+            catch(error) {
+                console.error(error);
+            }
+        }
+        if(changes.hasOwnProperty('token') && !changes.token.newValue) {
+            netatmo.reset().catch(console.error);
+        }
+    }
+});
+browser.runtime.onMessage.addListener((message) => {
+    if(message === 'login') {
+        return netatmo.login();
+    }
+    else if(message === 'getstations') {
+        return netatmo.getStationsList();
+    }
+});
+browser.notifications?.onShown.addListener(notificationListener);
+browser.permissions.onAdded.addListener(() => (change) => {
+    if(change.permissions && change.permissions.includes('notifications') && !browser.notifications.onShown.hasListener(notificationListener)) {
+        browser.notifications.onShown.addListener(notificationListener);
+    }
+});
