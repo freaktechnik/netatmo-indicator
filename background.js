@@ -4,6 +4,7 @@
  * obtain one at http://mozilla.org/MPL/2.0/.
  */
 /* globals clientToken, clientSecret */
+//TODO get rid of this.device for event page readyness
 //TODO add alternative weather API to use instead of an outdoor module.
 
 const HEX = 16,

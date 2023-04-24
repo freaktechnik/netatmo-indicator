@@ -30,7 +30,7 @@
         "page": "options.html",
         "browser_style": true
     },
-    "applications": {
+    "browser_specific_settings": {
         "gecko": {
             "id": "{4b69f471-a76c-4355-be23-8d9b0c9802db}",
             "strict_min_version": "62.0"
