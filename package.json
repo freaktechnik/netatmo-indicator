@@ -6,9 +6,8 @@
   "scripts": {
     "lint:js": "eslint *.js *.json --ext js,json",
     "lint:webext": "web-ext lint",
-    "lint:ec": "eclint check $(git ls-files)",
     "lint:css": "stylelint *.css",
-    "test": "npm run lint:js && npm run lint:webext && npm run lint:ec && npm run lint:css",
+    "test": "npm run lint:js && npm run lint:webext && npm run lint:css",
     "build": "web-ext build",
     "start": "web-ext run"
   },
@@ -27,9 +26,8 @@
   },
   "homepage": "https://github.com/freaktechnik/netatmo-indicator#readme",
   "devDependencies": {
-    "@freaktechnik/eslint-config-extension": "^9.1.1",
-    "eclint": "^2.8.1",
-    "eslint": "^8.39.0",
+    "@freaktechnik/eslint-config-extension": "^9.2.1",
+    "eslint": "^8.40.0",
     "stylelint": "^15.6.1",
     "stylelint-config-standard": "^33.0.0",
     "stylelint-no-unsupported-browser-features": "^6.1.0",

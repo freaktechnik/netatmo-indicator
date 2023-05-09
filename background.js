@@ -121,14 +121,14 @@ const HEX = 16,
         API_BASE: 'https://api.netatmo.com/',
         SAFETY_OFFSET: 100,
         get hasUpdateLoop() {
-            return sessionStorage.getItem('hasUpdateLoop') === "true" ?? false;
+            return sessionStorage.getItem('hasUpdateLoop') === "true";
         },
         set hasUpdateLoop(value) {
             sessionStorage.setItem('hasUpdateLoop', value);
         },
         redirectUri: browser.identity.getRedirectURL(),
         get waitingForOnline() {
-            return sessionStorage.getItem('waitingForOnline') === "true" ?? false;
+            return sessionStorage.getItem('waitingForOnline') === "true";
         },
         set waitingForOnline(value) {
             sessionStorage.setItem('waitingForOnline', value);
@@ -632,7 +632,7 @@ const HEX = 16,
                 try {
                     await this.login();
                 }
-                catch(error) {
+                catch{
                     console.warn("OAuth aborted");
                 }
             }

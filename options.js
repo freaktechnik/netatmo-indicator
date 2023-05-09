@@ -100,11 +100,11 @@ class BooleanPref extends Pref {
                     const requestPermission = () => {
                         if(this.input.checked) {
                             browser.permissions.request(NOTIFICATION_PERM).then((gotPermission) => {
-                                if(!gotPermission) {
-                                    throw new Error("Need notification permission to show notifications");
+                                if(gotPermission) {
+                                    this.input.removeEventListener("click", requestPermission);
                                 }
                                 else {
-                                    this.input.removeEventListener("click", requestPermission);
+                                    throw new Error("Need notification permission to show notifications");
                                 }
                             })
                                 .catch(showError);
