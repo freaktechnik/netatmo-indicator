@@ -4,7 +4,7 @@
   "description": "See your CO₂ level in the browser toolbar",
   "main": "background.js",
   "scripts": {
-    "lint:js": "eslint *.js *.json --ext js,json",
+    "lint:js": "eslint *.js *.json",
     "lint:webext": "web-ext lint",
     "lint:css": "stylelint *.css",
     "test": "npm run lint:js && npm run lint:webext && npm run lint:css",
@@ -26,7 +26,7 @@
   },
   "homepage": "https://github.com/freaktechnik/netatmo-indicator#readme",
   "devDependencies": {
-    "@freaktechnik/eslint-config-extension": "^9.2.1",
+    "@freaktechnik/eslint-config-extension": "^10.0.3",
     "eslint": "^8.57.0",
     "stylelint": "^16.3.1",
     "stylelint-config-standard": "^36.0.0",
@@ -55,5 +55,6 @@
       "package-lock.json",
       "README.md"
     ]
-  }
+  },
+  "type": "module"
 }

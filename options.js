@@ -16,29 +16,29 @@ const BOOLEAN_PREFS = [
         'yellowNotification',
         'greenNotification',
         'windowBadge',
-        'alwaysWindowBadge'
+        'alwaysWindowBadge',
     ],
 
     NUMBER_PREFS = [
         'interval',
         'windowDelta',
-        'windowMin'
+        'windowMin',
     ],
 
     BOUNDARY_COLORS = [
         'red',
         'orange',
-        'yellow'
+        'yellow',
     ],
 
     NOTIFICATION_PERM = {
-        permissions: [ 'notifications' ]
+        permissions: [ 'notifications' ],
     },
 
     showError = (error) => {
         let message;
         if(error instanceof Error) {
-            message = error.message;
+            ({ message }) = error;
         }
         else {
             message = error;
@@ -63,7 +63,7 @@ class Pref {
         this.input.addEventListener(eventType, () => {
             this.storeValue();
         }, {
-            passive: true
+            passive: true,
         });
     }
 
@@ -73,7 +73,7 @@ class Pref {
 
     storeValue() {
         browser.storage.local.set({
-            [this.id]: this.getValue()
+            [this.id]: this.getValue(),
         }).catch(showError);
     }
 
@@ -111,7 +111,7 @@ class BooleanPref extends Pref {
                         }
                     };
                     this.input.addEventListener('click', requestPermission, {
-                        passive: true
+                        passive: true,
                     });
                 }
             })
@@ -193,7 +193,7 @@ class BoundaryPref {
             boundaries[boundary.id] = value;
         }
         return browser.storage.local.set({
-            boundaries
+            boundaries,
         }).catch(showError);
     }
 
@@ -294,7 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const { token } = await browser.storage.local.get('token');
         if(token) {
             await browser.storage.local.set({
-                token: undefined
+                token: undefined,
             });
             login.textContent = 'Login';
             prefs.device.clear();
@@ -312,18 +312,18 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById("error").hidden = true;
             devices = browser.runtime.sendMessage('getstations');
             const {
-                device, outdoorModule
+                device, outdoorModule,
             } = await browser.storage.local.get([
                 'device',
-                'outdoorModule'
+                'outdoorModule',
             ]);
             await Promise.all([
                 prefs.device.fill(device),
-                prefs.outdoorModule.fill(outdoorModule)
+                prefs.outdoorModule.fill(outdoorModule),
             ]);
         }
     }, {
-        passive: true
+        passive: true,
     });
 
     document.getElementById("reset").addEventListener("click", () => {
@@ -333,9 +333,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     }, {
-        passive: true
+        passive: true,
     });
 }, {
     passive: true,
-    once: true
+    once: true,
 });
