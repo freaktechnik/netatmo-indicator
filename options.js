@@ -38,7 +38,7 @@ const BOOLEAN_PREFS = [
     showError = (error) => {
         let message;
         if(error instanceof Error) {
-            ({ message }) = error;
+            ({ message } = error);
         }
         else {
             message = error;
