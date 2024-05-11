@@ -573,7 +573,7 @@ const HEX = 16,
             if(parsedUrl.searchParams.has('state') && parsedUrl.searchParams.get('state') === authState && parsedUrl.searchParams.has('code')) {
                 const code = parsedUrl.searchParams.get('code'),
                     body = new URLSearchParams();
-                body.append('scope', scopes.replace(/\+/g, ' '));
+                body.append('scope', scopes.replaceAll("+", ' '));
                 body.append('code', code);
                 body.append('grant_type', 'authorization_code');
                 body.append('client_id', clientToken);
