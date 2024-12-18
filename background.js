@@ -93,7 +93,7 @@ const HEX = 16,
         return {};
     },
     waitForOnline = () => new Promise((resolve) => {
-        window.addEventListener("online", resolve, {
+        globalThis.addEventListener("online", resolve, {
             once: true,
             passive: true,
         });
