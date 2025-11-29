@@ -35,7 +35,7 @@
             "id": "{4b69f471-a76c-4355-be23-8d9b0c9802db}",
             "strict_min_version": "62.0",
             "data_collection_permissions": {
-                "required": ["authenticationInfo", "technicalAndInteraction"]
+                "required": ["authenticationInfo"]
             }
         }
     }
