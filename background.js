@@ -689,7 +689,12 @@ browser.storage.onChanged.addListener(async (changes, area) => {
         }
         // Don't have to udpate the button if the state has changed.
         else if(netatmo.device && (netatmo.BUTTON_PREFS.some((p) => changes.hasOwnProperty(p)) || (changes.hasOwnProperty('updateTheme') && changes.updateTheme.newValue))) {
-            netatmo.updateButton().catch(console.error);
+            try {
+                await netatmo.updateButton();
+            }
+            catch(error) {
+                console.error(error);
+            }
         }
         if(changes.hasOwnProperty('interval') && netatmo.hasUpdateLoop) {
             try {
@@ -705,7 +710,12 @@ browser.storage.onChanged.addListener(async (changes, area) => {
             }
         }
         if(changes.hasOwnProperty('token') && !changes.token.newValue) {
-            netatmo.reset().catch(console.error);
+            try {
+                await netatmo.reset();
+            }
+            catch(error) {
+                console.error(error);
+            }
         }
     }
 });

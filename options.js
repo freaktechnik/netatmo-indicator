@@ -128,9 +128,9 @@ class BooleanPref extends Pref {
 
     updateSubsections() {
         if(this.childSection) {
-            const disabled = !this.getValue();
+            const disabled = !this.getValue(),
+                inputs = this.childSection.querySelectorAll('input');
             this.childSection.classList.toggle('disabled', disabled);
-            const inputs = this.childSection.querySelectorAll('input');
             if(inputs && inputs.length) {
                 for(const input of inputs.values()) {
                     input.disabled = disabled;
@@ -279,9 +279,12 @@ document.addEventListener('DOMContentLoaded', () => {
     prefs.outdoorModule = new OutdoorList('outdoorModule');
     browser.storage.local.get(Object.keys(prefs).concat([ 'token' ]))
         .then((vals) => {
-            for(const p in prefs) {
-                if(prefs.hasOwnProperty(p) && vals.hasOwnProperty(p) && (vals.token || (p !== 'device' && p !== 'outdoorModule'))) {
-                    prefs[p].updateValue(vals[p]);
+            for(const [
+                key,
+                value,
+            ] of Object.entries(prefs)) {
+                if(vals.hasOwnProperty(key) && (vals.token || (key !== 'device' && key !== 'outdoorModule'))) {
+                    value.updateValue(vals[key]);
                 }
             }
             if(vals.token) {
@@ -327,10 +330,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById("reset").addEventListener("click", () => {
-        for(const p in prefs) {
-            if(prefs.hasOwnProperty(p)) {
-                prefs[p].reset();
-            }
+        for(const preference of Object.values(prefs)) {
+            preference.reset();
         }
     }, {
         passive: true,
