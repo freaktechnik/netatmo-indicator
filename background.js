@@ -294,7 +294,7 @@ const HEX = 16,
             return this.setState(newDevice, true, outdoorModule);
         },
         async getHomeCoachesData() {
-            const { token } = browser.storage.local.get('token');
+            const { token } = await browser.storage.local.get('token');
             if(!token) {
                 throw new Error("Not authorized");
             }
@@ -632,8 +632,8 @@ const HEX = 16,
                 try {
                     await this.login();
                 }
-                catch{
-                    console.warn("OAuth aborted");
+                catch(error) {
+                    console.warn("OAuth aborted", error);
                 }
             }
             else if(expires > Date.now()) {
