@@ -1,30 +1,30 @@
 {
   "name": "netatmo-indicator",
   "version": "1.6.15",
+  "private": true,
   "description": "See your CO₂ level in the browser toolbar",
-  "main": "background.js",
+  "license": "MPL-2.0",
+  "repository": "github:freaktechnik/netatmo-indicator",
+  "homepage": "https://github.com/freaktechnik/netatmo-indicator#readme",
+  "bugs": "https://github.com/freaktechnik/netatmo-indicator/issues",
+  "author": "Martin Giger (https://humanoids.be)",
+  "type": "module",
+  "main": "./background.js",
+  "engines": {
+    "node": ">= 22"
+  },
   "scripts": {
-    "lint:js": "eslint *.js *.json",
+    "lint:js": "eslint *.js manifest.json package.json",
     "lint:webext": "web-ext lint",
     "lint:css": "stylelint *.css",
     "test": "npm run lint:js && npm run lint:webext && npm run lint:css",
     "build": "web-ext build",
     "start": "web-ext run"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/freaktechnik/netatmo-indicator.git"
-  },
   "keywords": [
     "webextension",
     "netatmo"
   ],
-  "author": "Martin Giger (https://humanoids.be)",
-  "license": "MPL-2.0",
-  "bugs": {
-    "url": "https://github.com/freaktechnik/netatmo-indicator/issues"
-  },
-  "homepage": "https://github.com/freaktechnik/netatmo-indicator#readme",
   "devDependencies": {
     "@freaktechnik/eslint-config-extension": "^14.1.0",
     "eslint": "^10.14.0",
@@ -43,7 +43,6 @@
       "plugin/no-unsupported-browser-features": true
     }
   },
-  "private": true,
   "browserslist": [
     "last 1 Firefox versions",
     "last 1 FirefoxAndroid versions",
@@ -55,6 +54,5 @@
       "package-lock.json",
       "README.md"
     ]
-  },
-  "type": "module"
+  }
 }

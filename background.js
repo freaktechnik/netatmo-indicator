@@ -40,12 +40,12 @@ const HEX = 16,
         };
         if(device.dashboard_data) {
             formatted.temp = device.dashboard_data.Temperature;
-            if(device.dashboard_data.hasOwnProperty('CO2') && type !== 'outdoor') {
+            if(type !== 'outdoor' && device.dashboard_data.hasOwnProperty('CO2')) {
                 formatted.co2 = device.dashboard_data.CO2;
             }
         }
         else {
-            formatted.temp = NaN;
+            formatted.temp = Number.NaN;
         }
         if(device.hasOwnProperty('module_id')) {
             formatted.module_id = device.module_id;
@@ -71,10 +71,10 @@ const HEX = 16,
         name: device?.name,
         module: device?.module,
         co2: UNSET,
-        temp: NaN,
+        temp: Number.NaN,
     }),
     findOutdoorModules = (stations) => {
-        const modules = stations.map((s) => getOutdoorModules(s)).flat();
+        const modules = stations.flatMap((s) => getOutdoorModules(s));
         return modules.map((m) => formatDevice(m, 'outdoor'));
     },
     findDevice = (stations, device) => {
@@ -93,7 +93,7 @@ const HEX = 16,
         return {};
     },
     waitForOnline = () => new Promise((resolve) => {
-        globalThis.addEventListener("online", resolve, {
+        addEventListener("online", resolve, {
             once: true,
             passive: true,
         });
@@ -179,7 +179,7 @@ const HEX = 16,
             catch(error) {
                 if(error instanceof TypeError && error.name === "NetworkError" && this.networkErrorTries < MAX_NETWORK_ERRORS) {
                     const waitFor = (BACKOFF_BASE_MINS ** this.networkErrorTries);
-                    this.networkErrorTries = this.networkErrorTries + ONE_TRY;
+                    this.networkErrorTries += ONE_TRY;
                     browser.alarms.create(this.REFREASH_BACKOFF_ALARM, {
                         delayInMinutes: waitFor,
                     });
@@ -207,25 +207,28 @@ const HEX = 16,
             });
         },
         async ensureUpdateLoop() {
-            if(!this.hasUpdateLoop) {
-                const stations = await this.getStationsList();
-                if(stations.stations.length || this.device) {
-                    const { interval } = await browser.storage.local.get({
-                        interval: 10,
-                    });
-                    if(!this.device) {
-                        await this.restoreState(stations);
-                    }
-                    const alarmSpec = {
-                        periodInMinutes: interval,
-                    };
-                    if(this.device) {
-                        alarmSpec.when = Date.now() + this.SAFETY_OFFSET;
-                    }
-                    browser.alarms.create(this.UPDATE_ALARM, alarmSpec);
-                    this.hasUpdateLoop = true;
-                }
+            if(this.hasUpdateLoop) {
+                return;
             }
+
+            const stations = await this.getStationsList();
+            if(!stations.stations.length && !this.device) {
+                return;
+            }
+            const { interval } = await browser.storage.local.get({
+                interval: 10,
+            });
+            if(!this.device) {
+                await this.restoreState(stations);
+            }
+            const alarmSpec = {
+                periodInMinutes: interval,
+            };
+            if(this.device) {
+                alarmSpec.when = Date.now() + this.SAFETY_OFFSET;
+            }
+            browser.alarms.create(this.UPDATE_ALARM, alarmSpec);
+            this.hasUpdateLoop = true;
         },
         async fetchStationData(id) {
             const { token } = await browser.storage.local.get('token');
@@ -353,7 +356,7 @@ const HEX = 16,
             if(this.device.type === 'weather') {
                 return this.getStationData();
             }
-            else if(this.device.type === 'coach') {
+            if(this.device.type === 'coach') {
                 return this.getHomeCoachData();
             }
         },
@@ -377,7 +380,7 @@ const HEX = 16,
             }
             else if(stations?.stations.length) {
                 let outdoor = outdoorModule;
-                if(stations.outdoorModules.length && !outdoor) {
+                if(!outdoor && stations.outdoorModules.length) {
                     outdoor = stations.outdoorModules[FIRST];
                 }
                 let station;
@@ -411,13 +414,13 @@ const HEX = 16,
             if(this.device.co2 >= boundaries.red) {
                 return 'status/red.svg';
             }
-            else if(this.device.co2 >= boundaries.orange) {
+            if(this.device.co2 >= boundaries.orange) {
                 return 'status/orange.svg';
             }
-            else if(this.device.co2 >= boundaries.yellow) {
+            if(this.device.co2 >= boundaries.yellow) {
                 return 'status/yellow.svg';
             }
-            else if(this.device.co2 > UNSET) {
+            if(this.device.co2 > UNSET) {
                 return 'status/green.svg';
             }
             return 'status/gray.svg';
@@ -426,29 +429,31 @@ const HEX = 16,
             if(this.device.co2 >= boundaries.red) {
                 return '#ff0039';
             }
-            else if(this.device.co2 >= boundaries.orange) {
+            if(this.device.co2 >= boundaries.orange) {
                 return '#ff9400';
             }
-            else if(this.device.co2 >= boundaries.yellow) {
+            if(this.device.co2 >= boundaries.yellow) {
                 return '#ffe900';
             }
-            else if(this.device.co2 > UNSET && !onlyWarnTheme) {
+            if(this.device.co2 > UNSET && !onlyWarnTheme) {
                 return '#30e60b';
             }
+            return '#ffbbff';
         },
         getDarkColor(boundaries) {
             if(this.device.co2 >= boundaries.red) {
                 return '#5a0002';
             }
-            else if(this.device.co2 >= boundaries.orange) {
+            if(this.device.co2 >= boundaries.orange) {
                 return '#712b00';
             }
-            else if(this.device.co2 >= boundaries.yellow) {
+            if(this.device.co2 >= boundaries.yellow) {
                 return '#715100';
             }
-            else if(this.device.co2 > UNSET) {
+            if(this.device.co2 > UNSET) {
                 return '#006504';
             }
+            return '#550055';
         },
         async updateButton() {
             const {
@@ -503,63 +508,65 @@ const HEX = 16,
                     text: badgeText,
                 });
             }
-            if(updateTheme) {
-                const color = this.getColor(boundaries, onlyWarnTheme);
-                if(color) {
-                    browser.theme.update({
-                        colors: {
-                            frame: color,
-                        },
-                    });
-                }
-                else {
-                    browser.theme.reset();
-                }
+            if(!updateTheme) {
+                return;
+            }
+            const color = this.getColor(boundaries, onlyWarnTheme);
+            if(color) {
+                browser.theme.update({
+                    colors: {
+                        frame: color,
+                    },
+                });
+            }
+            else {
+                browser.theme.reset();
             }
         },
         async showNotification(previousCO2) {
             const canShow = await browser.permissions.contains({
                 permissions: [ 'notifications' ],
             });
-            if(canShow) {
-                const message = `CO₂ now at ${this.device.co2}ppm`,
-                    prefs = await browser.storage.local.get({
-                        redNotification: false,
-                        orangeNotification: false,
-                        yellowNotification: false,
-                        greenNotification: false,
-                        boundaries: this.DEFAULT_BOUNDARIES,
-                        windowDelta: this.DEFAULT_WINDOW_DELTA,
-                        windowMin: this.DEFAULT_WINDOW_MIN,
-                    }),
-                    iconUrl = this.getImage(prefs.boundaries),
-                    notifSpec = {
-                        message,
-                        iconUrl,
-                        type: 'basic',
-                    };
-                let shouldLowerCO2 = false;
-                if(previousCO2 < prefs.boundaries.yellow && this.device.co2 >= prefs.boundaries.yellow && prefs.yellowNotification) {
-                    notifSpec.title = `CO₂ level above ${prefs.boundaries.yellow}ppm`;
-                    shouldLowerCO2 = true;
-                }
-                else if(previousCO2 < prefs.boundaries.orange && this.device.co2 >= prefs.boundaries.orange && prefs.orangeNotification) {
-                    notifSpec.title = `CO₂ level above ${prefs.boundaries.orange}ppm`;
-                    shouldLowerCO2 = true;
-                }
-                else if(previousCO2 < prefs.boundaries.red && this.device.co2 >= prefs.boundaries.red && prefs.redNotification) {
-                    notifSpec.title = `CO₂ level above ${prefs.boundaries.red}ppm`;
-                    shouldLowerCO2 = true;
-                }
-                else if(previousCO2 >= prefs.boundaries.yellow && this.device.co2 < prefs.boundaries.yellow && prefs.greenNotification) {
-                    notifSpec.title = `CO₂ back to below ${prefs.boundaries.yellow}ppm`;
-                }
-                if(shouldLowerCO2 && this.outdoorModule && this.device.temp >= prefs.windowMin && this.device.temp - this.outdoorModule.temp >= prefs.windowDelta) {
-                    notifSpec.message += ". Open a window, it's cooler outside!";
-                }
-                if(notifSpec.title) {
-                    await browser.notifications.create(notifSpec);
-                }
+            if(!canShow) {
+                return;
+            }
+            const message = `CO₂ now at ${this.device.co2}ppm`,
+                prefs = await browser.storage.local.get({
+                    redNotification: false,
+                    orangeNotification: false,
+                    yellowNotification: false,
+                    greenNotification: false,
+                    boundaries: this.DEFAULT_BOUNDARIES,
+                    windowDelta: this.DEFAULT_WINDOW_DELTA,
+                    windowMin: this.DEFAULT_WINDOW_MIN,
+                }),
+                iconUrl = this.getImage(prefs.boundaries),
+                notifSpec = {
+                    message,
+                    iconUrl,
+                    type: 'basic',
+                };
+            let shouldLowerCO2 = false;
+            if(previousCO2 < prefs.boundaries.yellow && this.device.co2 >= prefs.boundaries.yellow && prefs.yellowNotification) {
+                notifSpec.title = `CO₂ level above ${prefs.boundaries.yellow}ppm`;
+                shouldLowerCO2 = true;
+            }
+            else if(previousCO2 < prefs.boundaries.orange && this.device.co2 >= prefs.boundaries.orange && prefs.orangeNotification) {
+                notifSpec.title = `CO₂ level above ${prefs.boundaries.orange}ppm`;
+                shouldLowerCO2 = true;
+            }
+            else if(previousCO2 < prefs.boundaries.red && this.device.co2 >= prefs.boundaries.red && prefs.redNotification) {
+                notifSpec.title = `CO₂ level above ${prefs.boundaries.red}ppm`;
+                shouldLowerCO2 = true;
+            }
+            else if(previousCO2 >= prefs.boundaries.yellow && this.device.co2 < prefs.boundaries.yellow && prefs.greenNotification) {
+                notifSpec.title = `CO₂ back to below ${prefs.boundaries.yellow}ppm`;
+            }
+            if(shouldLowerCO2 && this.outdoorModule && this.device.temp >= prefs.windowMin && this.device.temp - this.outdoorModule.temp >= prefs.windowDelta) {
+                notifSpec.message += ". Open a window, it's cooler outside!";
+            }
+            if(notifSpec.title) {
+                await browser.notifications.create(notifSpec);
             }
         },
         async login() {
@@ -675,47 +682,49 @@ browser.browserAction.onClicked.addListener(() => {
     });
 });
 browser.storage.onChanged.addListener(async (changes, area) => {
-    if(area === 'local') {
-        if(changes.hasOwnProperty('updateTheme') && changes.updateTheme.oldValue && !changes.updateTheme.newValue) {
-            browser.theme.reset();
+    if(area !== 'local') {
+        return;
+    }
+
+    if(changes.hasOwnProperty('updateTheme') && changes.updateTheme.oldValue && !changes.updateTheme.newValue) {
+        browser.theme.reset();
+    }
+    if(changes.hasOwnProperty('device') && !isSameDevice(changes.device.newValue, changes.device.oldValue)) {
+        // Need to await so outdoor module doesn't clash with this.
+        await netatmo.setState(changes.device.newValue, false, netatmo.outdoorModule).catch(console.error);
+        netatmo.ensureUpdateLoop();
+    }
+    if(changes.hasOwnProperty('outdoorModule') && !isSameDevice(changes.outdoorModule.newValue, changes.outdoorModule.oldValue)) {
+        await netatmo.setState(netatmo.device, false, changes.outdoorModule.newValue).catch(console.error);
+    }
+    // Don't have to udpate the button if the state has changed.
+    else if(netatmo.device && (netatmo.BUTTON_PREFS.some((p) => changes.hasOwnProperty(p)) || (changes.hasOwnProperty('updateTheme') && changes.updateTheme.newValue))) {
+        try {
+            await netatmo.updateButton();
         }
-        if(changes.hasOwnProperty('device') && !isSameDevice(changes.device.newValue, changes.device.oldValue)) {
-            // Need to await so outdoor module doesn't clash with this.
-            await netatmo.setState(changes.device.newValue, false, netatmo.outdoorModule).catch(console.error);
-            netatmo.ensureUpdateLoop();
+        catch(error) {
+            console.error(error);
         }
-        if(changes.hasOwnProperty('outdoorModule') && !isSameDevice(changes.outdoorModule.newValue, changes.outdoorModule.oldValue)) {
-            await netatmo.setState(netatmo.device, false, changes.outdoorModule.newValue).catch(console.error);
-        }
-        // Don't have to udpate the button if the state has changed.
-        else if(netatmo.device && (netatmo.BUTTON_PREFS.some((p) => changes.hasOwnProperty(p)) || (changes.hasOwnProperty('updateTheme') && changes.updateTheme.newValue))) {
-            try {
-                await netatmo.updateButton();
-            }
-            catch(error) {
-                console.error(error);
+    }
+    if(changes.hasOwnProperty('interval') && netatmo.hasUpdateLoop) {
+        try {
+            await browser.alarms.clear(netatmo.UPDATE_ALARM);
+            if(changes.interval.newValue) {
+                browser.alarms.create(netatmo.UPDATE_ALARM, {
+                    periodInMinutes: changes.interval.newValue,
+                });
             }
         }
-        if(changes.hasOwnProperty('interval') && netatmo.hasUpdateLoop) {
-            try {
-                await browser.alarms.clear(netatmo.UPDATE_ALARM);
-                if(changes.interval.newValue) {
-                    browser.alarms.create(netatmo.UPDATE_ALARM, {
-                        periodInMinutes: changes.interval.newValue,
-                    });
-                }
-            }
-            catch(error) {
-                console.error(error);
-            }
+        catch(error) {
+            console.error(error);
         }
-        if(changes.hasOwnProperty('token') && !changes.token.newValue) {
-            try {
-                await netatmo.reset();
-            }
-            catch(error) {
-                console.error(error);
-            }
+    }
+    if(changes.hasOwnProperty('token') && !changes.token.newValue) {
+        try {
+            await netatmo.reset();
+        }
+        catch(error) {
+            console.error(error);
         }
     }
 });
@@ -723,7 +732,7 @@ browser.runtime.onMessage.addListener((message) => {
     if(message === 'login') {
         return netatmo.login();
     }
-    else if(message === 'getstations') {
+    if(message === 'getstations') {
         return netatmo.getStationsList();
     }
 });

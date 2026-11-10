@@ -37,7 +37,7 @@ const BOOLEAN_PREFS = [
 
     showError = (error) => {
         let message;
-        if(error instanceof Error) {
+        if(Error.isError(error)) {
             ({ message } = error);
         }
         else {
@@ -78,10 +78,12 @@ class Pref {
     }
 
     reset() {
-        if(this.defaultValue !== undefined) {
-            this.updateValue(this.defaultValue);
-            this.storeValue();
+        if(this.defaultValue === undefined) {
+            return;
         }
+
+        this.updateValue(this.defaultValue);
+        this.storeValue();
     }
 
     updateValue(value) {
@@ -96,45 +98,56 @@ class BooleanPref extends Pref {
         super(id, 'input', 'checked');
         if(id.endsWith('Notification')) {
             browser.permissions.contains(NOTIFICATION_PERM).then((hasPermission) => {
-                if(!hasPermission) {
-                    const requestPermission = () => {
-                        if(this.input.checked) {
-                            browser.permissions.request(NOTIFICATION_PERM).then((gotPermission) => {
-                                if(gotPermission) {
-                                    this.input.removeEventListener("click", requestPermission);
-                                }
-                                else {
-                                    throw new Error("Need notification permission to show notifications");
-                                }
-                            })
-                                .catch(showError);
-                        }
-                    };
-                    this.input.addEventListener('click', requestPermission, {
-                        passive: true,
-                    });
+                if(hasPermission) {
+                    return;
                 }
+
+                this.input.addEventListener('click', this.#requestPermission, {
+                    passive: true,
+                });
             })
                 .catch(showError);
         }
 
         const nextSection = this.input.parentElement.nextElementSibling;
         this.childSection = undefined;
-        if(nextSection && nextSection.tagName.toLowerCase() === 'section' && !nextSection.classList.contains('no-indent')) {
-            this.childSection = nextSection;
-            this.updateSubsections();
+        if(!(nextSection && nextSection.tagName.toLowerCase() === 'section') || nextSection.classList.contains('no-indent')) {
+            return;
         }
+
+        this.childSection = nextSection;
+        this.updateSubsections();
     }
 
+    #requestPermission = async () => {
+        if(!this.input.checked) {
+            return;
+        }
+        try {
+            const gotPermission = await browser.permissions.request(NOTIFICATION_PERM);
+            if(gotPermission) {
+                this.input.removeEventListener("click", this.#requestPermission, { passive: true });
+            }
+            else {
+                throw new Error("Need notification permission to show notifications");
+            }
+        }
+        catch(error) {
+            showError(error);
+        }
+    };
+
     updateSubsections() {
-        if(this.childSection) {
-            const disabled = !this.getValue(),
-                inputs = this.childSection.querySelectorAll('input');
-            this.childSection.classList.toggle('disabled', disabled);
-            if(inputs && inputs.length) {
-                for(const input of inputs.values()) {
-                    input.disabled = disabled;
-                }
+        if(!this.childSection) {
+            return;
+        }
+
+        const disabled = !this.getValue(),
+            inputs = this.childSection.querySelectorAll('input');
+        this.childSection.classList.toggle('disabled', disabled);
+        if(inputs?.length) {
+            for(const input of inputs.values()) {
+                input.disabled = disabled;
             }
         }
     }
@@ -179,7 +192,7 @@ class BoundaryPref {
 
     storeValue() {
         const boundaries = {};
-        let previousValue = Infinity;
+        let previousValue = Number.POSITIVE_INFINITY;
         for(const boundary of this.boundaries) {
             const value = boundary.getValue();
             boundary.input.max = previousValue;
